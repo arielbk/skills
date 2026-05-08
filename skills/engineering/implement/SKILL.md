@@ -7,6 +7,12 @@ description: Execute a feature's task slices end-to-end using TDD, writing a log
 
 Execute a feature's slice DAG from `docs/{feature}/{feature}.tasks.md`. Work through each unblocked slice using TDD, keep a running log, and generate a QA plan when done.
 
+## Roles
+
+**Orchestrator** (this agent): reads the DAG, dispatches slices, waits for completion, re-evaluates. Stays lightweight — it does not hold implementation details in context.
+
+**Slice agents**: each runs in a fresh context window. They read the log to understand what prior slices did, implement their slice with TDD, write their own log entry, and update their slice status. They report back only `done` or `needs-review` — the orchestrator needs nothing else.
+
 **Resources (load when needed):**
 - [tdd-loop.md](resources/tdd-loop.md) — red/green/refactor loop and test quality rules
 - [log-format.md](resources/log-format.md) — how to write log entries
@@ -53,13 +59,13 @@ Load [tdd-loop.md](resources/tdd-loop.md) before starting.
 
 ### 4a. Parallel execution (multiple unblocked slices)
 
-Spawn one sub-agent per unblocked slice. Each agent receives:
+Spawn one sub-agent per unblocked slice. Each agent is self-contained — it does not share context with the orchestrator or sibling agents. Brief each agent with:
 - The slice slug and its full spec from the tasks file
-- The path to the tasks file (to update its own status only)
-- The path to the log file (to append its entry)
+- Paths to the tasks file and log file
 - The contents of [tdd-loop.md](resources/tdd-loop.md) and [log-format.md](resources/log-format.md)
+- Instruction to read the current log before starting — prior slice agents will have written entries that may be relevant (shared types, APIs, conventions established)
 
-Each agent works independently. The orchestrator waits for all to complete, then re-reads the tasks file and returns to step 3.
+Each agent works independently and reports back only its final status (`done` or `needs-review`). The orchestrator re-reads the tasks file when all are done and returns to step 3.
 
 **Constraints:**
 - Each agent updates only its own slice's status — no other rows.
