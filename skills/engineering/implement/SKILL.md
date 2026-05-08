@@ -32,22 +32,39 @@ Which would you like to implement?
 
 Load `docs/{feature}/{feature}.tasks.md`. Parse all slices, their statuses, and their `Depends on:` fields.
 
-### 3. Pick the next slice
+### 3. Identify unblocked slices
 
-Select the highest-priority unblocked slice: **status is `not-started`** and all `Depends on:` slices have status `done`.
+Collect all slices where **status is `not-started`** and all `Depends on:` slices have status `done`.
 
-If no slices are unblocked (all remaining are blocked or in-progress), report what's blocking and stop.
+- **None unblocked** → report what's blocking and stop.
+- **One unblocked** → execute it directly (step 4).
+- **Multiple unblocked** → spawn one sub-agent per slice and run them in parallel (step 4a), then return here when all complete.
 
-### 4. Execute the slice with TDD
+### 4. Execute a slice with TDD
 
 Load [tdd-loop.md](resources/tdd-loop.md) before starting.
 
-For each slice:
 1. Set **Status** to `in-progress` in the tasks file.
 2. Explore the relevant code if needed.
 3. Work through behaviors using the red→green loop — one test, one implementation, repeat.
 4. Never reference the PRD, tasks file, or any planning document in code comments.
 5. When all behaviors pass and code is clean, set **Status** to `done` (or `needs-review` if `Human checkpoint: yes`).
+6. Write a log entry (see step 5).
+
+### 4a. Parallel execution (multiple unblocked slices)
+
+Spawn one sub-agent per unblocked slice. Each agent receives:
+- The slice slug and its full spec from the tasks file
+- The path to the tasks file (to update its own status only)
+- The path to the log file (to append its entry)
+- The contents of [tdd-loop.md](resources/tdd-loop.md) and [log-format.md](resources/log-format.md)
+
+Each agent works independently. The orchestrator waits for all to complete, then re-reads the tasks file and returns to step 3.
+
+**Constraints:**
+- Each agent updates only its own slice's status — no other rows.
+- If any slice has `Human checkpoint: yes`, do not parallelize it with others — run it alone so the user can review before work continues.
+- If two unblocked slices touch the same file heavily, flag this to the user and ask whether to run sequentially instead.
 
 ### 5. Write a log entry
 
