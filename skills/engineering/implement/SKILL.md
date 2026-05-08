@@ -97,4 +97,4 @@ Read `{feature}.tasks.md` and `{feature}.log.md`, then write `docs/{feature}/{fe
 - Slices with `Human checkpoint: yes`
 - Log entries with deviations or unusual decisions
 
-Tell the user the QA plan is ready and where to find it.
+Tell the user the QA plan is at `docs/{feature}/{feature}.qa.md`. Then stop completely — do not offer to fix failing tests, suggest a next feature, or continue in any direction. The user will `/clear` and continue when they're ready.

@@ -60,6 +60,10 @@ Create `docs/{feature}/` if it doesn't exist. If `docs/{feature}/{feature}.tasks
 
 Load [task-template.md](resources/task-template.md) and use it to format each slice consistently.
 
+### 7. Stop
+
+Tell the user the tasks file is at `docs/{feature}/{feature}.tasks.md`. Then stop completely — do not offer to implement, offer to start a slice, or suggest what comes next. The user will `/clear` and continue when they're ready.
+
 ## File structure
 
 ```

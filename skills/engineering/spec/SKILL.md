@@ -33,6 +33,10 @@ Create `docs/{feature}/` if it doesn't exist. Write `docs/{feature}/{feature}.pr
 
 The file is ephemeral by default — the team may delete it once the feature ships, or keep it for review and reference. Do not reference it in code comments.
 
+### 6. Stop
+
+Tell the user the PRD is at `docs/{feature}/{feature}.prd.md`. Then stop completely — do not suggest next steps, offer to slice, or offer to implement. The user will `/clear` and continue when they're ready.
+
 ## Template
 
 ```markdown
