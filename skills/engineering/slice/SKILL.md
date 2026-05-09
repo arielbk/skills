@@ -9,6 +9,8 @@ Turn aligned work into a small DAG of vertical slices in `docs/{feature}/{featur
 
 This is NOT an issue-tracker tool. Output is a local markdown file the agent updates statuses on as work progresses.
 
+> **Free-form questions only.** Every question this skill asks the user — especially in step 5 grilling — MUST be plain text in the chat. Do NOT use the `AskUserQuestion` multi-choice UI under any circumstance. Multi-choice forces premature framing and breaks the open-ended grilling loop.
+
 See [task-template.md](resources/task-template.md) for the exact slice format and status enum.
 
 ## Process
@@ -62,7 +64,7 @@ Load [task-template.md](resources/task-template.md) and use it to format each sl
 
 ### 7. Stop
 
-Tell the user the tasks file is at `docs/{feature}/{feature}.tasks.md`. Then stop completely — do not offer to implement, offer to start a slice, or suggest what comes next. The user will `/clear` and continue when they're ready.
+Tell the user the tasks file is at `docs/{feature}/{feature}.tasks.md`, and that they can run `/dispatch {feature}` or `/implement {feature}` in a fresh session when ready. Then stop completely — do not offer to implement, offer to start a slice, or suggest what comes next. The user will `/clear` and continue when they're ready.
 
 ## File structure
 
