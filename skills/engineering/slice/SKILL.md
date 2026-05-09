@@ -9,7 +9,7 @@ Turn aligned work into a small DAG of vertical slices in `docs/{feature}/{featur
 
 This is NOT an issue-tracker tool. Output is a local markdown file the agent updates statuses on as work progresses.
 
-> **Free-form questions only.** Every question this skill asks the user — especially in step 5 grilling — MUST be plain text in the chat. Do NOT use the `AskUserQuestion` multi-choice UI under any circumstance. Multi-choice forces premature framing and breaks the open-ended grilling loop.
+> **Free-form questions only.** Any question this skill asks the user MUST be plain text in the chat. Do NOT use the `AskUserQuestion` multi-choice UI under any circumstance.
 
 See [task-template.md](resources/task-template.md) for the exact slice format and status enum.
 
@@ -43,18 +43,22 @@ Aim for **3–8 slices**.
 - Every slice has a feedback loop. If the only loop is "it looks right," the slice is under-specified.
 </slice-rules>
 
-### 5. Propose the draft, then grill
+### 5. Propose the draft and confirm
 
-Show the user the draft slice list (title + one-line summary + deps). Then ask **2–4 sharp questions** that challenge the cuts:
+Show the user the draft slice list (title + one-line summary + deps). The user has likely just come out of `/grill-me` and is alignment-fatigued — assume they want to confirm and move on, not start another interrogation.
 
-- **Boundaries** — "Slice 2 and 3 share a lot of context. Should they merge?"
-- **Outside-in** — "Slice N's surface looks like an internal helper. What does the caller actually do?"
-- **Feedback loops** — "Slice N's only loop is a manual check. Is there a cheap automated test?"
-- **Dependencies** — "I marked Slice 4 depending on 2, but the schema change isn't used until 5. Can 4 run in parallel?"
-- **Checkpoint placement** — "No human checkpoints across 6 slices. Anything user-facing enough to eyeball first?"
-- **Missing slice** — "Nothing covers X. Intentional, or a gap?"
+After the draft, surface a short **"Things to think about"** list calling out anything that is genuinely *not* cut-and-dry — at most 2–3 bullets. Each bullet is a one-line note, not a question. Pick from categories like:
 
-Ask one at a time. Update the draft as the user answers. Stop grilling once the user signs off.
+- **Boundaries** — "Slices 2 and 3 share a lot of context; could merge if you'd rather."
+- **Outside-in** — "Slice N's surface reads like an internal helper — flag if the consumer is different."
+- **Feedback loops** — "Slice N relies on a manual eyeball check; there might be a cheap automated alternative."
+- **Dependencies** — "Slice 4 depends on 2 but the schema change isn't used until 5; could run independently."
+- **Checkpoint placement** — "No human checkpoints across the run; flag if anything user-facing should get one."
+- **Missing slice** — "Nothing covers X; flag if that's a gap."
+
+If nothing is genuinely uncertain, omit the section. Don't manufacture concerns.
+
+End with a single confirmation prompt: "Look right, or want to adjust anything?" The user can sign off, push back on a specific bullet (which can become a back-and-forth), or rework the draft. Default mode is sign-off.
 
 ### 6. Write the file
 
