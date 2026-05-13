@@ -4,7 +4,7 @@ Copy this file to `config.md` and fill in your own values. `config.md` is gitign
 
 ## Identity
 
-- **Timezone**: `Europe/Belgrade`
+- **Timezone**: `Europe/Zagreb`
 - **Work email / calendar ID**: `you@yourcompany.com`
 - **Personal planning calendar ID**: `your-google-calendar-id@group.calendar.google.com`
 
