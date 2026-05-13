@@ -1,6 +1,6 @@
 ---
 name: slice
-description: Break aligned work into vertical tracer-bullet slices with explicit dependencies, outside-in API sketches, and per-slice feedback loops. Writes a docs/{feature}/{feature}.tasks.md DAG agents can work through. Use after /grill-me, or when the user wants to slice a plan into orchestrate-able tasks. Trigger phrases - "slice this", "break this into tasks", "/slice".
+description: Break aligned work into vertical tracer-bullet slices with explicit dependencies, outside-in API sketches, and per-slice feedback loops. Writes a docs/{feature}/{feature}.tasks.md DAG agents can work through. Use after /scope, or when the user wants to slice a plan into orchestrate-able tasks. Trigger phrases - "slice this", "break this into tasks", "/slice".
 ---
 
 # Slice
@@ -21,7 +21,7 @@ Look at the conversation context. Is there a clear goal, scope, and rough constr
 
 - **Yes** → continue.
 - **No, but the user passed a one-line prompt as an argument** → use that as the brief and continue.
-- **No** → suggest the user run `/grill-me` first to align, then come back. Stop.
+- **No** → suggest the user run `/scope` first to align, then come back. Stop.
 
 ### 2. Explore the codebase if needed
 
@@ -45,7 +45,7 @@ Aim for **3–8 slices**.
 
 ### 5. Propose the draft and confirm
 
-Show the user the draft slice list (title + one-line summary + deps). The user has likely just come out of `/grill-me` and is alignment-fatigued — assume they want to confirm and move on, not start another interrogation.
+Show the user the draft slice list (title + one-line summary + deps). The user has likely just come out of `/scope` and is alignment-fatigued — assume they want to confirm and move on, not start another interrogation.
 
 After the draft, surface a short **"Things to think about"** list calling out anything that is genuinely *not* cut-and-dry — at most 2–3 bullets. Each bullet is a one-line note, not a question. Pick from categories like:
 
