@@ -62,9 +62,10 @@ Proposed split:
    - Create one `time_entries` record per service with:
      - `time` in minutes
      - `date` as YYYY-MM-DD
-     - `note` as a markdown bullet list of activities — **no project name prefix** (it's visible from context)
-     - `person`: your person ID from config
-     - `service`: the matched service ID
+     - `note` formatted as **plain markdown** — bullets with `- `, newlines between them, nesting via two-space indent. **Do NOT use HTML tags** (`<ul>`/`<li>` render literally in the Productive UI). No project name prefix (it's visible from the service context).
+     - `person`: your person ID from config (as a string, e.g. `"505211"` — not an object)
+     - `service`: the matched service ID (as a string)
+   - Make notes specific: name the actual artefact or action ("Architecture walkthrough generation for review handoff"), not generic labels ("walkthrough work").
 
 ## Duration parsing
 
