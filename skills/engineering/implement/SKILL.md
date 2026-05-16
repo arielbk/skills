@@ -133,10 +133,11 @@ When the gate passes:
 1. Re-read the tasks file once for freshness.
 2. Read the log file in full (`docs/{feature}/{feature}.log.md`).
 3. Load [qa-template.md](resources/qa-template.md).
-4. Compose `docs/{feature}/{feature}.qa.md` per the template, weighted toward:
-   - Slices with `Human checkpoint: yes`.
-   - Log entries with non-empty `Deviations:` or unusual `Notes:`.
-   - Standard checks for the rest.
+4. Compose `docs/{feature}/{feature}.qa.md` per the template. Split items into two halves:
+   - **Already verified by the agent** (checked, near the top) — tests, linters, typechecks, builds, CLI smoke checks the agent actually ran during implementation. Pull these from the log. Each gets a `- [x]` with a one-line result.
+   - **Human verification required** (unchecked) — slices with `Human checkpoint: yes`, plus anything needing a browser, device, or human judgement.
+   - **Watch closely** — log entries with non-empty `Deviations:` or unusual `Notes:`.
+   Do not put CLI commands in the unchecked sections if the agent already ran them — that erodes trust in the checklist.
 5. Tell the user the path:
 
    ```
