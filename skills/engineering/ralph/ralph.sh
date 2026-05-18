@@ -65,10 +65,12 @@ PROMPT="$(render_prompt)"
 
 # `docker sandbox run` requires a TTY on stdin, which we won't have when
 # ralph.sh is invoked from a non-interactive parent (e.g. another claude
-# session). `script -q /dev/null <cmd>` allocates a pty wrapper that satisfies
-# the TTY check without changing the command's behaviour.
-if ! command -v script >/dev/null 2>&1; then
-  echo "ralph: 'script' not found on PATH; required to allocate a pty for docker sandbox" >&2
+# session whose Bash tool pipes a socket as stdin). We use Python's `pty.spawn`
+# to allocate a fresh pty and re-exec the command under it — unlike `script -q
+# /dev/null`, this does not call tcgetattr on its own stdin and therefore works
+# even when stdin is a socket.
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "ralph: 'python3' not found on PATH; required to allocate a pty for docker sandbox" >&2
   exit 69
 fi
 
@@ -130,12 +132,19 @@ for ((i = 1; i <= MAX_ITERATIONS; i++)); do
   #     └─ jq FINAL_RESULT > result_file
   #                              ← the single structured per-iteration outcome
   #                                the orchestrating agent reacts to
-  if ! script -q /dev/null docker sandbox run "$SANDBOX_NAME" -- \
+  # `docker sandbox run` prints a non-JSON preamble ("Starting claude agent…",
+  # "Workspace: …") before the stream-json output begins; grep '^{' keeps only
+  # JSON-shaped lines so jq doesn't choke. set -o pipefail is in effect, so any
+  # silent jq parse error would otherwise abort the iteration with no captured
+  # output.
+  if ! python3 -c 'import pty,sys; sys.exit(pty.spawn(sys.argv[1:]) >> 8)' \
+        docker sandbox run "$SANDBOX_NAME" -- \
         --dangerously-skip-permissions \
         --verbose -p --output-format stream-json \
         "$PROMPT" 2>&1 \
       | tee "$raw_file" \
       | tr -d '\r' \
+      | grep --line-buffered '^{' \
       | tee >(jq -rj --unbuffered "$STREAM_TEXT" 2>/dev/null) \
       | jq -rj --unbuffered "$FINAL_RESULT" 2>/dev/null > "$result_file"; then
     echo "ralph: iteration $i exited non-zero; continuing" >&2
