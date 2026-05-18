@@ -97,6 +97,14 @@ Write to `Dailies/{date}.md` using `Templates/Dailies.md` as structure. Fill in:
 
 **Use tabs (not spaces) for all indentation** (Obsidian config).
 
+### 9. Check the pomodoro timer
+
+Run `pmdr status --json`. Surface what you find:
+- `state: "idle"` → nudge: "💡 No pomodoro running — start one with `pmdr start --project NAME --duration 25m --no-interactive &` when you begin the first block."
+- `state: "running"` or `"paused"` → confirm: "✅ Pomodoro `{state}` for {project} ({remainingMs} remaining)."
+
+Do **not** auto-start a timer. The user picks the project when they actually begin work.
+
 ### After completion
 
 Tell the user:

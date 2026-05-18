@@ -29,6 +29,7 @@ Run `date +%Y-%m-%d`.
 - `mcp__claude_ai_Google_Calendar__list_events` on work calendar for today — actual meetings
 - `mcp__granola__list_meetings` → fetch notes for today's meetings with `mcp__granola__get_meeting_transcript`
 - Read `Areas/Life OS/Day flow.md`
+- `pmdr today --json` — completed pomodoros grouped by project, as a data point on deep-work blocks
 
 ### 3. Compute planned vs actual from the Log
 
@@ -65,6 +66,9 @@ Delta:
 
 📝 Granola meeting notes:
 {condensed key points + action items}
+
+🍅 Pomodoros (deep-work blocks):
+{per-project: N pomodoros, total time} — total {sum}
 
 ---
 
