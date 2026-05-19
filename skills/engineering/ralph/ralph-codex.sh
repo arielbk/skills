@@ -91,8 +91,13 @@ for ((i = 1; i <= MAX_ITERATIONS; i++)); do
   #
   # Sandbox: workspace-write keeps codex confined to the repo, no network or
   # outside-workspace writes, while still letting it commit + run tests.
+  # writable_roots re-adds .git, which workspace-write hardcodes as read-only
+  # (Codex 0.129 has no toggle for it) — without this, `git add` fails with
+  # `Unable to create '.git/index.lock': Operation not permitted` and every
+  # iteration STUCKs on commit.
   # </dev/null prevents codex's stdin-readback from blocking.
   if ! codex exec --json --skip-git-repo-check -s workspace-write \
+        -c "sandbox_workspace_write.writable_roots=[\"$REPO_ROOT/.git\"]" \
         "$PROMPT" </dev/null 2>&1 \
       | tee "$raw_file" \
       | grep --line-buffered '^{' \
