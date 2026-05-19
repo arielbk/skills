@@ -1,0 +1,17 @@
+# Per-project extras for the worktree skill.
+#
+# Copy this file to `.claude/worktree-copy.txt` at your repo root, then list any
+# additional paths the worktree skill should copy into every new worktree. The
+# skill's fixed allowlist (env files, .claude/settings.local.json, etc.) is
+# already applied — this file is for repo-specific local-only files.
+#
+# Rules:
+# - One path per line, relative to the repo root.
+# - Blank lines and lines starting with `#` are ignored.
+# - Missing files are silently skipped.
+# - Permissions are preserved.
+
+# Examples — uncomment and adapt:
+# docker-compose.override.yml
+# .dev.vars
+# config/local.toml

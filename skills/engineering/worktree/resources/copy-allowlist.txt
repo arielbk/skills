@@ -1,0 +1,14 @@
+# Fixed allowlist of local-only files the worktree skill copies into every new worktree.
+# One path per line, relative to the source checkout root. Blank lines and `#` comments ignored.
+# Missing files are silently skipped.
+
+.env
+.env.local
+.env.development
+.env.development.local
+.env.test
+.env.test.local
+.envrc
+
+.claude/settings.local.json
+.claude/.credentials.json
