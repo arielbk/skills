@@ -68,7 +68,7 @@ Load [task-template.md](resources/task-template.md) and use it to format each sl
 
 ### 7. Stop
 
-Tell the user the tasks file is at `docs/{feature}/{feature}.tasks.md`, and that they can run `/dispatch {feature}` or `/implement {feature}` in a fresh session when ready. Then stop completely — do not offer to implement, offer to start a slice, or suggest what comes next. The user will `/clear` and continue when they're ready.
+Tell the user the tasks file is at `docs/{feature}/{feature}.tasks.md`, and that they can run `/implement {feature}` in a fresh session when ready. Then stop completely — do not offer to implement, offer to start a slice, or suggest what comes next. The user will `/clear` and continue when they're ready.
 
 ## File structure
 

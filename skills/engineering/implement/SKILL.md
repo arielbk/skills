@@ -7,11 +7,9 @@ description: Execute a feature's task slices end-to-end using TDD, writing a log
 
 Execute a feature's slice DAG from `docs/{feature}/{feature}.tasks.md` **sequentially** in one orchestrator session. Run each unblocked slice one at a time, keep a running log, and generate a QA plan when done. The orchestrator does slice work inline by default and may delegate individual slices to fresh sub-agents when that's cheaper for context.
 
-This is the day-to-day driver. Reach for `/dispatch` instead when you want parallel execution, worktree isolation, and strict orchestrator/sub-agent separation.
-
 ## Roles
 
-**Orchestrator** (this agent): reads the DAG, picks the next unblocked slice, decides inline vs delegate, runs or dispatches it, handles the result, re-evaluates. Stays light on context.
+**Orchestrator** (this agent): reads the DAG, picks the next unblocked slice, decides inline vs delegate, runs or delegates it, handles the result, re-evaluates. Stays light on context.
 
 **Slice agents** (only when delegating): each runs in a fresh context window. They read the tasks file, the log, and `slice-prompt.md`, implement their slice with TDD, write a log entry, update only their own row, and emit exactly one `<status>` tag.
 

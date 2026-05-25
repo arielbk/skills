@@ -11,7 +11,9 @@ You have **no memory of prior iterations**. Everything you need is on disk.
 
 ## Completion check (do this first)
 
-Scan the tasks file. If **every** slice has `Status: done`, your job is to emit the completion sentinel and stop. Output, as the very last thing in your reply:
+Ralph treats `done` and `needs-review` as **settled** statuses — both mean the loop has nothing left to automate on that slice. A `needs-review` slice is a `Human checkpoint: yes` (or self-flagged) slice whose automated work is finished; a human verifies it later from the QA plan, but it does not block the loop.
+
+Scan the tasks file. If **every** slice is settled (`Status: done` or `Status: needs-review`), your job is to emit the completion sentinel and stop. Output, as the very last thing in your reply:
 
 ```
 <promise>COMPLETE</promise>
@@ -19,20 +21,22 @@ Scan the tasks file. If **every** slice has `Status: done`, your job is to emit 
 
 Do nothing else. Do not commit. Do not write a log entry. Exit.
 
-If any slice is `not-started`, `in-progress`, `needs-review`, or `blocked`, continue to the next section.
+If any slice is `not-started`, `in-progress`, or `blocked`, continue to the next section.
 
 ## Pick a slice
 
 Find any slice where:
 - `Status:` is `not-started`, **and**
-- every entry under `Depends on:` has `Status: done` in the tasks file.
+- every entry under `Depends on:` is **settled** — `Status: done` or `Status: needs-review` — in the tasks file.
+
+A dependency that is `needs-review` counts as satisfied: a flagged checkpoint slice must not orphan its dependents.
 
 If multiple are eligible, pick whichever looks highest-priority — earlier in file order, smallest, or unblocking the most downstream work. Use your judgement. You only need to pick **one**.
 
-If no slice is `not-started` but some are `in-progress`, `needs-review`, or `blocked`, do not pick them up — they belong to a human or a prior iteration's incomplete state. Emit:
+If no slice is pickable but some are still unsettled (`in-progress` or `blocked`, or a `not-started` slice whose dependencies are not all settled), do not pick them up — they belong to a human or a prior iteration's incomplete state. Emit:
 
 ```
-<promise>STUCK: {short reason naming the non-done slices and their statuses}</promise>
+<promise>STUCK: {short reason naming the unsettled slices and their statuses}</promise>
 ```
 
 …and exit. (The outer loop will treat this as non-complete and eventually hit the iteration cap; the user will intervene.)

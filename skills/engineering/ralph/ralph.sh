@@ -109,6 +109,26 @@ fi
 
 echo "ralph: reusing sandbox '${SANDBOX_NAME}' (workspace ${REPO_ROOT})" >&2
 
+# Login probe: a workspace sandbox existing does not mean it's logged in (OAuth
+# state lives inside the VM as of plugin v0.12, and a freshly-created sandbox has
+# none). Rather than inspect credential files, run a minimal sandboxed `claude -p`
+# and require it to actually answer. A logged-out sandbox errors out here, so we
+# abort during preflight with the login instructions instead of burning
+# iteration 1 on an auth failure.
+echo "ralph: probing sandbox '${SANDBOX_NAME}' login state…" >&2
+probe_out="$(python3 -c 'import pty,sys; sys.exit(pty.spawn(sys.argv[1:]) >> 8)' \
+    docker sandbox run "$SANDBOX_NAME" -- \
+    --dangerously-skip-permissions -p "Reply with the single word READY and nothing else." 2>&1 || true)"
+if ! printf '%s' "$probe_out" | grep -q "READY"; then
+  echo "ralph: sandbox '${SANDBOX_NAME}' is not logged in (auth probe did not return READY)." >&2
+  echo "       Run this once interactively to log in:" >&2
+  echo "         docker sandbox run claude" >&2
+  echo "         # inside: /login → complete OAuth → /quit" >&2
+  echo "       Then re-invoke /ralph." >&2
+  exit 78
+fi
+echo "ralph: login probe passed." >&2
+
 for ((i = 1; i <= MAX_ITERATIONS; i++)); do
   echo "─── ralph iteration $i / $MAX_ITERATIONS ───"
 

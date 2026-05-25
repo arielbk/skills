@@ -44,7 +44,7 @@ Always check:
 
 Claude runtime only:
 - `docker` is on PATH and `docker sandbox` is configured. If `docker sandbox --help` fails, tell the user to set up the sandbox first and stop.
-- A docker sandbox **already exists for this workspace** and the user has logged into it once (`docker sandbox run claude` → `/login` → complete OAuth → `/quit`). OAuth state lives inside the sandbox VM in plugin v0.12+, not on a host proxy, so a freshly-created sandbox is not logged in. `docker sandbox ls --json` should list a sandbox whose `workspaces` contains the current repo path. ralph.sh looks one up and aborts with instructions if none is found.
+- A docker sandbox **already exists for this workspace** and the user has logged into it once (`docker sandbox run claude` → `/login` → complete OAuth → `/quit`). OAuth state lives inside the sandbox VM in plugin v0.12+, not on a host proxy, so a freshly-created sandbox is not logged in. `docker sandbox ls --json` should list a sandbox whose `workspaces` contains the current repo path. ralph.sh looks one up and aborts with instructions if none is found, then runs a minimal sandboxed `claude -p` login probe and aborts with the same instructions if the sandbox exists but isn't authenticated — so an un-authed sandbox fails during preflight, not on iteration 1.
 
 Codex runtime only:
 - `codex` is on PATH. Auth is not pre-checked — `codex exec` fails loudly on iteration 1 if the user is not logged in (`codex login`).
@@ -93,6 +93,6 @@ Then **stop completely**. No next-step offers. The user will `/clear` when ready
 
 - **One slice per iteration.** Each agent invocation implements exactly one unblocked slice and exits. The sandbox enforces isolation; the prompt enforces single-slice scope.
 - **Sandboxed only.** Never call `claude -p` without `docker sandbox run` and `--dangerously-skip-permissions`. Never call `codex exec` without `-s workspace-write` (or stronger user-approved restriction). The loop is fire-and-forget; safety comes from the sandbox.
-- **Sentinels are canonical.** Loop exits on either terminal sentinel in the iteration's `result` payload — `<promise>COMPLETE</promise>` (all slices done) or `<promise>STUCK: ...</promise>` (no pickable slice — emitted when remaining slices are `in-progress`, `needs-review`, or `blocked`). The iteration prompt requires the sentinel be the last line of the reply, which puts it in the `result` event. No file-state parsing in bash.
+- **Sentinels are canonical.** Loop exits on either terminal sentinel in the iteration's `result` payload — `<promise>COMPLETE</promise>` (every slice settled: `done` or `needs-review`) or `<promise>STUCK: ...</promise>` (no pickable slice while some remain unsettled — `in-progress`, `blocked`, or `not-started` with unsettled deps). The iteration prompt requires the sentinel be the last line of the reply, which puts it in the `result` event. No file-state parsing in bash.
 - **QA only on clean completion.** Iteration-cap and STUCK exits do not produce a QA plan; they surface current slice statuses for human intervention.
 - **No replacement for `/implement`.** `/ralph` coexists with `/implement` — they read the same tasks file and write the same log/QA artefacts.
