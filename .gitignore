@@ -2,3 +2,6 @@
 node_modules/
 *.log
 skills/personal/config.md
+
+# Generated scratch — PRDs, task DAGs, logs, QA plans the skills write per feature
+docs/

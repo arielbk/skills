@@ -83,7 +83,7 @@ Use Day flow as the guide:
 
 ### 7. On confirmation, write calendar events
 
-For each block: `mcp__claude_ai_Google_Calendar__create_event` with `calendarId` = Personal planning ID, `timeZone` = `Europe/Belgrade`.
+For each block: `mcp__claude_ai_Google_Calendar__create_event` with `calendarId` = Personal planning ID and `timeZone` = the Timezone (both from `config.md`).
 - Title: emoji + short label (`🎯 Workshop prep — outline section 2`)
 - Description: which priority/side quest it ties to
 

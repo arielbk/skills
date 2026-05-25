@@ -23,7 +23,7 @@ Parse the `📓 Log` section of a daily note, calculate total work hours, apply 
 3. Calculate:
    - **Work time = (end − start) − total break time**
    - Multiple start/end pairs (split shift): calculate each session separately, then sum.
-   - **Lunch benefit**: if work time > 5h30m, add 30 minutes to total billable time. Note it explicitly in the summary.
+   - **Lunch benefit**: if work time is **≥ 5h30m** (greater than *or equal to* — at exactly 5h30m the benefit applies), add 30 minutes to total billable time. Note it explicitly in the summary.
    - **Round** the final billable total to the nearest 15 minutes.
 
 4. Extract what was worked on:
@@ -43,7 +43,7 @@ Breaks: {total-break}
   - {HH:MM}–{HH:MM} — {description} ({duration})
 
 Calculation: {elapsed} − {break} = {work-time}
-{+ 30m paid lunch (over 5.5h threshold) = {billable-total} → rounded to {rounded-total}}
+{+ 30m paid lunch (work ≥ 5.5h) = {billable-total} → rounded to {rounded-total}}
 
 📋 What You Worked On
   - {project}: {themes/activities}
@@ -63,7 +63,7 @@ Proposed split:
      - `time` in minutes
      - `date` as YYYY-MM-DD
      - `note` formatted as **plain markdown** — bullets with `- `, newlines between them, nesting via two-space indent. **Do NOT use HTML tags** (`<ul>`/`<li>` render literally in the Productive UI). No project name prefix (it's visible from the service context).
-     - `person`: your person ID from config (as a string, e.g. `"505211"` — not an object)
+     - `person`: your Productive person ID from `config.md` (as a string — not an object)
      - `service`: the matched service ID (as a string)
    - Make notes specific: name the actual artefact or action ("Architecture walkthrough generation for review handoff"), not generic labels ("walkthrough work").
 
