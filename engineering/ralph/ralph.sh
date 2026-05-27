@@ -144,8 +144,12 @@ for ((i = 1; i <= MAX_ITERATIONS; i++)); do
   #     │
   #     ├─ tee raw_file        ← full JSON stream saved for diagnostics
   #     │
-  #     ├─ tr -d '\r'          ← script(1)'s pty wrapper inserts CRs; strip them
-  #     │                        so jq sees clean line-delimited JSON
+  #     ├─ awk strip-CR        ← pty.spawn's terminal inserts CRs; strip them
+  #     │                        so jq sees clean line-delimited JSON. Must use
+  #     │                        awk with fflush() (not `tr -d '\r'`), because
+  #     │                        tr block-buffers when its stdout is a pipe,
+  #     │                        which causes the live stream to bunch up and
+  #     │                        only emit at iteration end.
   #     │
   #     ├─ tee >(jq STREAM_TEXT) ← live text echoed to terminal as it arrives
   #     │
@@ -163,7 +167,7 @@ for ((i = 1; i <= MAX_ITERATIONS; i++)); do
         --verbose -p --output-format stream-json \
         "$PROMPT" 2>&1 \
       | tee "$raw_file" \
-      | tr -d '\r' \
+      | awk '{ sub(/\r$/, ""); print; fflush() }' \
       | grep --line-buffered '^{' \
       | tee >(jq -rj --unbuffered "$STREAM_TEXT" 2>/dev/null) \
       | jq -rj --unbuffered "$FINAL_RESULT" 2>/dev/null > "$result_file"; then
@@ -178,7 +182,7 @@ for ((i = 1; i <= MAX_ITERATIONS; i++)); do
     printf '%s\n' "$result"
   else
     echo "(no result event captured — falling back to raw stream tail)"
-    tail -c 4000 "$raw_file" | tr -d '\r' | jq -rj --unbuffered "$STREAM_TEXT" 2>/dev/null || true
+    tail -c 4000 "$raw_file" | awk '{ sub(/\r$/, ""); print }' | jq -rj --unbuffered "$STREAM_TEXT" 2>/dev/null || true
   fi
   echo "─── /iteration $i summary ───"
 
