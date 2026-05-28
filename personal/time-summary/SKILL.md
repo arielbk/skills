@@ -58,7 +58,7 @@ Proposed split:
 
 6. Ask the user to confirm or adjust the split, then log to Productive:
    - Look up service IDs via `search_resource` (type: `services`) if not already known
-   - Look up person ID via `search_resource` (type: `people`) for your name if needed (see `skills/personal/config.md` for your Productive person ID)
+   - Look up person ID via `search_resource` (type: `people`) for your name if needed (see `../config.md` relative to this skill's directory for your Productive person ID)
    - Create one `time_entries` record per service with:
      - `time` in minutes
      - `date` as YYYY-MM-DD

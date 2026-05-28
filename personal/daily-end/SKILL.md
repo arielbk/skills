@@ -11,7 +11,7 @@ This skill is stateless — it derives all context from the daily note, calendar
 
 ## Constants
 
-Read `skills/personal/config.md` for personal values (timezone, calendar IDs). The config file is gitignored and not committed to the repo.
+Read `../config.md` (relative to this skill's directory) for personal values (timezone, calendar IDs). The config file is gitignored and not committed to the repo. If it doesn't exist, tell the user to run `/setup`.
 
 - **Day flow file**: `Areas/Life OS/Day flow.md`
 - **Daily notes path**: `Dailies/{YYYY-MM-DD}.md`

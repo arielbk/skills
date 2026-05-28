@@ -68,7 +68,7 @@ Load [task-template.md](resources/task-template.md) and use it to format each sl
 
 ### 7. Stop
 
-Tell the user the tasks file is at `docs/{feature}/{feature}.tasks.md`, and that they can run `/implement {feature}` in a fresh session when ready. Then stop completely — do not offer to implement, offer to start a slice, or suggest what comes next. The user will `/clear` and continue when they're ready.
+Tell the user the tasks file is at `docs/{feature}/{feature}.tasks.md`, and that they can run `/implement {feature}` (single orchestrator session) or `/ralph {feature}` (fresh-context loop, one slice per iteration) in a fresh session when ready. Then stop completely — do not offer to implement, offer to start a slice, or suggest what comes next. The user will `/clear` and continue when they're ready.
 
 ## File structure
 
@@ -77,8 +77,8 @@ docs/
   {feature}/
     {feature}.tasks.md   ← this skill writes this
     {feature}.prd.md     ← written by /to-prd
-    {feature}.log.md     ← written by /implement
-    {feature}.qa.md      ← written by /implement at end
+    {feature}.log.md     ← written by /implement or /ralph
+    {feature}.qa.md      ← written by /implement or /ralph at end
 ```
 
 ## File template

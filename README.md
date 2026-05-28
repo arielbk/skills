@@ -8,8 +8,8 @@ Big thanks to [Matt Pocock's skills](https://github.com/mattpocock/skills), whic
 
 Two kinds of skill, organised by folder:
 
-- **`skills/engineering/`** — general-purpose dev workflow (planning, slicing work into tasks, TDD-driven implementation).
-- **`skills/personal/`** — my daily-driver workflow, wired to my own stack (Obsidian, Things, Productive, Google Calendar). These read every personal value from a gitignored `config.md`, so fork them and adjust the prose to your own tools.
+- **`engineering/`** — general-purpose dev workflow (planning, slicing work into tasks, TDD-driven implementation).
+- **`personal/`** — my daily-driver workflow, wired to my own stack (Obsidian, Things, Productive, Google Calendar). These read every personal value from a gitignored `config.md`, so fork them and adjust the prose to your own tools.
 
 Browse the folders to see what's there — each skill's `SKILL.md` documents itself, and that's the source of truth (a README list here would just go stale).
 

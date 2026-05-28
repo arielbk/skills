@@ -7,7 +7,7 @@ description: Interactively bootstrap config for skills that ship a config.exampl
 
 Bootstrap the gitignored `config.md` that personal skills read for their values. The installer (`npx skills add`) puts skill files on the machine; this skill owns config only.
 
-The logic keys off the presence of a `config.example.md` next to a skill, so it works for any skill group that ships one — today that's `skills/personal/`.
+The logic keys off the presence of a `config.example.md` next to a skill, so it works for any skill group that ships one — today that's `personal/`.
 
 ## Steps
 
