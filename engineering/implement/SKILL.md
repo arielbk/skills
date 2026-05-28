@@ -7,6 +7,8 @@ description: Execute a feature's task slices end-to-end using TDD, writing a log
 
 Execute a feature's slice DAG from `docs/{feature}/{feature}.tasks.md` **sequentially** in one orchestrator session. Run each unblocked slice one at a time, keep a running log, and generate a QA plan when done. The orchestrator does slice work inline by default and may delegate individual slices to fresh sub-agents when that's cheaper for context.
 
+`/implement` is the **interactive** runner: a human is present, so it pauses at every `needs-review` slice (step 6) for real-time review. Its AFK sibling `/ralph` runs the same DAG unattended in a sandboxed loop — it never pauses for a human; it settles `needs-review` slices and defers all human checks to the QA plan. Use `/implement` when you want to be in the loop; use `/ralph` to let it simmer and come back to a QA plan.
+
 ## Roles
 
 **Orchestrator** (this agent): reads the DAG, picks the next unblocked slice, decides inline vs delegate, runs or delegates it, handles the result, re-evaluates. Stays light on context.

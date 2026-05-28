@@ -7,8 +7,8 @@ description: Ralph Wiggum loop variant of /implement — drives a feature's task
 
 `/ralph` is an alternate execution mode for `/implement`. Same inputs (`docs/{feature}/{feature}.tasks.md`), same artefacts (`{feature}.log.md`, `{feature}.qa.md`), different runtime: instead of one orchestrator session that does or delegates every slice, a bash loop spawns a fresh sandboxed agent per iteration. Each iteration has its own context, its own quota, and exits after one slice. This trades coherent in-session narration for unbounded total context budget.
 
-Ralph has two runtimes:
-- **Claude (default)** — `ralph.sh`, runs `claude -p` inside a docker sandbox VM.
+Ralph has two runtimes, both host-native (no Docker, no per-project VM):
+- **Claude (default)** — `ralph.sh`, runs `claude -p` wrapped in [Anthropic's sandbox runtime](https://github.com/anthropic-experimental/sandbox-runtime) (`@anthropic-ai/sandbox-runtime`), which confines the whole process with macOS Seatbelt / Linux bubblewrap. Auth comes from the host's existing Claude login — no in-sandbox `/login`.
 - **Codex** — `ralph-codex.sh`, runs `codex exec --json -s workspace-write` directly on the host (Codex sandboxes itself).
 
 This skill's job is small: pick the runtime, validate inputs, invoke the bundled script, and report the outcome. The real work happens in the subprocesses.
@@ -43,8 +43,9 @@ Always check:
 - The repo is a git repo with a clean-ish tree (uncommitted changes are fine, but warn the user — each iteration commits).
 
 Claude runtime only:
-- `docker` is on PATH and `docker sandbox` is configured. If `docker sandbox --help` fails, tell the user to set up the sandbox first and stop.
-- A docker sandbox **already exists for this workspace** and the user has logged into it once (`docker sandbox run claude` → `/login` → complete OAuth → `/quit`). OAuth state lives inside the sandbox VM in plugin v0.12+, not on a host proxy, so a freshly-created sandbox is not logged in. `docker sandbox ls --json` should list a sandbox whose `workspaces` contains the current repo path. ralph.sh looks one up and aborts with instructions if none is found, then runs a minimal sandboxed `claude -p` login probe and aborts with the same instructions if the sandbox exists but isn't authenticated — so an un-authed sandbox fails during preflight, not on iteration 1.
+- The sandbox runtime is reachable: either `srt` is on PATH or `npx` is (the script falls back to `npx -y @anthropic-ai/sandbox-runtime`, which fetches+caches the package on first use). If neither is present, tell the user to `npm i -g @anthropic-ai/sandbox-runtime` and stop.
+- `claude` is on PATH and the **host** is already logged in (`claude -p 'say hi'` works). The sandbox runs on the host and reuses host credentials — there is no separate sandbox login. ralph.sh runs a one-shot `READY` probe through the sandbox before iterating, so a logged-out host or a broken sandbox launch fails during preflight, not on iteration 1.
+- Sandbox policy is generated per-run and scoped to this repo (repo dir + `~/.claude` writable, `*.anthropic.com` network). If a slice's feedback loop needs more (e.g. a package registry to install deps), point `RALPH_SRT_SETTINGS` at your own settings file — see the sandbox-runtime README for the schema.
 
 Codex runtime only:
 - `codex` is on PATH. Auth is not pre-checked — `codex exec` fails loudly on iteration 1 if the user is not logged in (`codex login`).
@@ -62,7 +63,7 @@ bash {skill-dir}/ralph-codex.sh {feature} {max-iterations}
 ```
 
 Default `max-iterations` to `30` unless the user passed an explicit cap. Stream the output. Both scripts:
-- Loop up to `max-iterations` times, each iteration spawning a fresh agent (`claude -p` in a docker sandbox for `ralph.sh`; `codex exec --json -s workspace-write` on the host for `ralph-codex.sh`).
+- Loop up to `max-iterations` times, each iteration spawning a fresh agent (`claude -p` under the sandbox runtime for `ralph.sh`; `codex exec --json -s workspace-write` on the host for `ralph-codex.sh`).
 - Pipe the iteration's JSON stream through `jq`:
   - Live agent text is tee'd to the orchestrator's terminal as it arrives.
   - A per-iteration result payload is captured and printed inside an `─── iteration N summary ───` block.
@@ -92,7 +93,8 @@ Then **stop completely**. No next-step offers. The user will `/clear` when ready
 ## Constraints
 
 - **One slice per iteration.** Each agent invocation implements exactly one unblocked slice and exits. The sandbox enforces isolation; the prompt enforces single-slice scope.
-- **Sandboxed only.** Never call `claude -p` without `docker sandbox run` and `--dangerously-skip-permissions`. Never call `codex exec` without `-s workspace-write` (or stronger user-approved restriction). The loop is fire-and-forget; safety comes from the sandbox.
-- **Sentinels are canonical.** Loop exits on either terminal sentinel in the iteration's `result` payload — `<promise>COMPLETE</promise>` (every slice settled: `done` or `needs-review`) or `<promise>STUCK: ...</promise>` (no pickable slice while some remain unsettled — `in-progress`, `blocked`, or `not-started` with unsettled deps). The iteration prompt requires the sentinel be the last line of the reply, which puts it in the `result` event. No file-state parsing in bash.
+- **Sandboxed only.** Never call `claude -p --dangerously-skip-permissions` without wrapping it in the sandbox runtime (`srt`/`npx @anthropic-ai/sandbox-runtime`). Never call `codex exec` without `-s workspace-write` (or stronger user-approved restriction). The loop is fire-and-forget; safety comes from the sandbox.
+- **Never halt for a human.** Ralph is AFK. `needs-review` is a *settled* status the loop steps past, not a stop — all human-review items are collected into the QA plan at the end. Human checkpoints are `/implement`'s concern. The only non-completion halt is STUCK (a genuine dead-end), and an orphaned `in-progress` slice from a crashed iteration is reclaimed, never treated as STUCK.
+- **Sentinels are canonical.** Loop exits on either terminal sentinel in the iteration's `result` payload — `<promise>COMPLETE</promise>` (every slice settled: `done` or `needs-review`) or `<promise>STUCK: ...</promise>` (a genuine dead-end: a `blocked` slice, or a `not-started` slice gated behind one). An orphaned `in-progress` slice is reclaimed by the next iteration, not a STUCK trigger. The iteration prompt requires the sentinel be the last line of the reply, which puts it in the `result` event. No file-state parsing in bash.
 - **QA only on clean completion.** Iteration-cap and STUCK exits do not produce a QA plan; they surface current slice statuses for human intervention.
 - **No replacement for `/implement`.** `/ralph` coexists with `/implement` — they read the same tasks file and write the same log/QA artefacts.
