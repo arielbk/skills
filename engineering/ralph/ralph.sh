@@ -48,11 +48,13 @@ if ! command -v jq >/dev/null 2>&1; then
 fi
 
 # Resolve the sandbox-runtime launcher. Prefer a globally-installed `srt`
-# binary; fall back to `npx`, which caches the package after the first fetch.
+# binary (user-managed, version-agnostic); fall back to `npx` pinned to a
+# known-good version — the settings schema below is what 0.0.52 validates, and
+# an unpinned fetch could silently break every run on a future schema change.
 if command -v srt >/dev/null 2>&1; then
   SRT_BIN=(srt)
 elif command -v npx >/dev/null 2>&1; then
-  SRT_BIN=(npx -y @anthropic-ai/sandbox-runtime)
+  SRT_BIN=(npx -y @anthropic-ai/sandbox-runtime@0.0.52)
 else
   echo "ralph: neither 'srt' nor 'npx' found on PATH." >&2
   echo "       Install the sandbox runtime: npm i -g @anthropic-ai/sandbox-runtime" >&2
@@ -79,34 +81,63 @@ if [ -n "${RALPH_SRT_SETTINGS:-}" ]; then
 else
   SRT_SETTINGS="$(mktemp -t ralph-srt-settings.XXXXXX.json)"
   CLEANUP_SETTINGS=1
-  TMP_ROOT="${TMPDIR:-/tmp}"
+  # sandbox-runtime v0.0.52 validates a nested filesystem/network schema and
+  # requires every key present; the obsolete flat shape is rejected, which
+  # collapses to deny-all and kills the probe. /tmp + /var/folders cover temp
+  # writes on both Linux and macOS (where TMPDIR lives under /var/folders).
   cat > "$SRT_SETTINGS" <<JSON
 {
-  "allowWrite": [
-    "$REPO_ROOT",
-    "$HOME/.claude",
-    "$HOME/.claude.json",
-    "${TMP_ROOT%/}"
-  ],
-  "allowNetwork": [
-    "*.anthropic.com"
-  ]
+  "filesystem": {
+    "denyRead": [],
+    "allowRead": [],
+    "allowWrite": [
+      "$REPO_ROOT",
+      "$HOME/.claude",
+      "$HOME/.claude.json",
+      "/tmp",
+      "/var/folders"
+    ],
+    "denyWrite": []
+  },
+  "network": {
+    "allowedDomains": [
+      "*.anthropic.com",
+      "anthropic.com"
+    ],
+    "deniedDomains": [],
+    "allowUnixSockets": [],
+    "allowLocalBinding": false
+  }
 }
 JSON
   echo "ralph: generated sandbox settings at $SRT_SETTINGS (repo + ~/.claude writable; *.anthropic.com network)" >&2
 fi
 
-cleanup() { [ "${CLEANUP_SETTINGS:-0}" = "1" ] && rm -f "$SRT_SETTINGS"; }
+# An `if` block, not `[ … ] && rm`: the && form returns 1 when the condition
+# is false (the RALPH_SRT_SETTINGS path), and an EXIT trap's status replaces
+# the script's real exit code — masking a successful COMPLETE's exit 0.
+cleanup() {
+  if [ "${CLEANUP_SETTINGS:-0}" = "1" ]; then
+    rm -f "$SRT_SETTINGS"
+  fi
+}
 trap cleanup EXIT
 
 # jq filters applied to claude's --output-format stream-json stream.
 #   STREAM_TEXT  — extracts each assistant text chunk as it arrives, for live
-#                  echo to the orchestrator's terminal.
+#                  echo to the orchestrator's terminal. Applied with `jq -R`
+#                  via a `fromjson?` prefix so a malformed line can't kill the
+#                  live jq — a dead jq SIGPIPEs grep and then tee, truncating
+#                  the raw file before the result event is flushed.
 #   FINAL_RESULT — extracts the single `result` event emitted at iteration end;
 #                  this is the canonical iteration outcome and the only thing
-#                  we sentinel-check.
+#                  we sentinel-check. Applied with `jq -rR` over the raw file:
+#                  each line parses independently via `fromjson?`, so a
+#                  malformed line (stderr bytes splicing into the stream) is
+#                  skipped instead of aborting extraction and losing a result
+#                  event that is physically present later in the file.
 STREAM_TEXT='select(.type == "assistant").message.content[]? | select(.type == "text").text // empty'
-FINAL_RESULT='select(.type == "result").result // empty'
+FINAL_RESULT='fromjson? | select(.type == "result").result // empty'
 
 render_prompt() {
   sed \
@@ -138,13 +169,17 @@ echo "ralph: probe passed." >&2
 for ((i = 1; i <= MAX_ITERATIONS; i++)); do
   echo "─── ralph iteration $i / $MAX_ITERATIONS ───"
 
-  raw_file="$(mktemp)"
+  raw_file="$(mktemp -t "ralph-iter-$i.raw")"
+  stderr_file="$(mktemp -t "ralph-iter-$i.stderr")"
   result_file="$(mktemp)"
 
   # Stream pipeline. Because claude runs directly under the sandbox runtime
   # (no Docker, no pty), its stream-json output is clean line-delimited JSON on
-  # stdout — no CR-stripping or pty allocation needed. We:
-  #   1. tee the full stream to raw_file for diagnostics,
+  # stdout — no CR-stripping or pty allocation needed. Only stdout feeds the
+  # pipeline: stderr goes to its own per-iteration diagnostics file, because a
+  # stderr byte landing mid-line in the JSON stream produces a malformed
+  # `{`-prefixed line that can cost us the result event. We:
+  #   1. tee the full stdout stream to raw_file for diagnostics,
   #   2. keep only JSON-shaped lines (grep '^{'),
   #   3. echo live assistant text to the terminal (jq STREAM_TEXT),
   # then re-read raw_file once to extract the canonical result deterministically
@@ -152,14 +187,14 @@ for ((i = 1; i <= MAX_ITERATIONS; i++)); do
   if ! "${SRT_BIN[@]}" --settings "$SRT_SETTINGS" \
         claude -p --dangerously-skip-permissions \
         --verbose --output-format stream-json \
-        "$PROMPT" 2>&1 \
+        "$PROMPT" 2>"$stderr_file" \
       | tee "$raw_file" \
       | grep --line-buffered '^{' \
-      | jq -rj --unbuffered "$STREAM_TEXT" 2>/dev/null; then
+      | jq -Rrj --unbuffered "fromjson? | $STREAM_TEXT" 2>/dev/null; then
     echo "ralph: iteration $i exited non-zero; continuing" >&2
   fi
 
-  grep '^{' "$raw_file" | jq -rj "$FINAL_RESULT" 2>/dev/null > "$result_file" || true
+  jq -rR "$FINAL_RESULT" "$raw_file" > "$result_file"
 
   result="$(cat "$result_file")"
 
@@ -167,13 +202,20 @@ for ((i = 1; i <= MAX_ITERATIONS; i++)); do
   echo "─── iteration $i summary ───"
   if [ -n "$result" ]; then
     printf '%s\n' "$result"
+    rm -f "$raw_file"
   else
+    # A result event should exist even on agent failure; its absence means the
+    # stream was truncated or claude died early. Keep the diagnostics files
+    # and say so — never silently show an empty summary.
+    echo "ralph: no result event recovered from iteration $i" >&2
+    echo "ralph: raw stream kept at    $raw_file" >&2
+    echo "ralph: claude stderr kept at $stderr_file" >&2
     echo "(no result event captured — falling back to raw stream tail)"
-    tail -c 4000 "$raw_file" | grep '^{' | jq -rj "$STREAM_TEXT" 2>/dev/null || true
+    tail -c 4000 "$raw_file" | grep '^{' | jq -Rrj "fromjson? | $STREAM_TEXT" 2>/dev/null || true
   fi
   echo "─── /iteration $i summary ───"
 
-  rm -f "$raw_file" "$result_file"
+  rm -f "$result_file"
 
   if [[ "$result" == *"<promise>COMPLETE</promise>"* ]]; then
     echo "─── ralph: COMPLETE sentinel detected after $i iteration(s) ───"
