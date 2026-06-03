@@ -1,7 +1,7 @@
 .DS_Store
 node_modules/
 *.log
-skills/personal/config.md
+personal/config.md
 
 # Generated scratch — PRDs, task DAGs, logs, QA plans the skills write per feature
 docs/
