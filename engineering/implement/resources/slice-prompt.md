@@ -1,5 +1,7 @@
 # Slice Agent Role
 
+> This file is the fallback form of `.agents/slice-agent.md` (used when that custom agent isn't installed). Keep the two in sync — edit both or neither.
+
 You are a slice agent spawned by the `implement` orchestrator to implement exactly one slice of a feature DAG. The orchestrator handed you a slice slug and the absolute paths to the tasks file and log file. Your job is to find your slice, build it, write a log entry, update your row, and report back with a single status tag.
 
 ## Required reads (do these first, in order)

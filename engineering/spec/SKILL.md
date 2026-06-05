@@ -17,6 +17,8 @@ Generate a kebab-case slug from the feature being described (e.g. `checkout-flow
 
 Understand the current state of the relevant areas. Use the project's domain glossary vocabulary throughout the PRD, and respect any ADRs in the area you're touching.
 
+Prefer delegating the exploration to the read-only `Explore` sub-agent: pass the feature brief and require a map of at most ~30 lines — one finding per line with a `file:line` reference, no file contents — covering the modules touched, prior art, glossary terms, and relevant ADRs. Read a specific file yourself only when a PRD decision turns on its exact contents.
+
 ### 3. Collect resources
 
 Scan the conversation for any resource links — Figma boards, Notion docs, design specs, external APIs, tickets. Include them in the PRD's Resources section so implementing agents know what's fetchable. If an MCP server exists for a linked resource (e.g. Figma), note that the agent can use it to pull assets directly.

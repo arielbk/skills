@@ -13,13 +13,13 @@ Execute a feature's slice DAG from `docs/{feature}/{feature}.tasks.md` **sequent
 
 **Orchestrator** (this agent): reads the DAG, picks the next unblocked slice, decides inline vs delegate, runs or delegates it, handles the result, re-evaluates. Stays light on context.
 
-**Slice agents** (only when delegating): each runs in a fresh context window. They read the tasks file, the log, and `slice-prompt.md`, implement their slice with TDD, write a log entry, update only their own row, and emit exactly one `<status>` tag.
+**Slice agents** (only when delegating): each runs in a fresh context window — the `slice-agent` custom agent if available, a generic sub-agent pointed at `slice-prompt.md` otherwise. They read the tasks file and the log, implement their slice with TDD, write a log entry, update only their own row, and emit exactly one `<status>` tag.
 
 **Resources (load when needed):**
 - [tdd-loop.md](resources/tdd-loop.md) — red/green/refactor loop and test quality rules. Load before inline TDD work.
 - [log-format.md](resources/log-format.md) — how to write log entries.
 - [qa-template.md](resources/qa-template.md) — QA plan structure. Load at end of run.
-- [slice-prompt.md](resources/slice-prompt.md) — slice-agent role definition. The orchestrator does not read this — it points sub-agents at it.
+- [slice-prompt.md](resources/slice-prompt.md) — slice-agent role definition in file form, used by the fallback path when the `slice-agent` custom agent isn't installed. The orchestrator does not read this — it points sub-agents at it.
 - [delegation-handoff.md](resources/delegation-handoff.md) — when to delegate and the spawn-message template. Load only when delegating.
 
 ## Process
@@ -92,6 +92,8 @@ You parse the tag and nothing else from the agent's reply. Do not read code the 
 
 When a slice's status becomes `needs-review` (whether `Human checkpoint: yes` or self-flagged), surface to the user and pause.
 
+**Fresh-eyes review (optional).** If the `slice-reviewer` custom agent is available, spawn it before surfacing: pass the slug, `TASKS_PATH`, `LOG_PATH`, and the changed-file list from `git diff --name-only HEAD`. It reads the spec and diff in its own context and returns `verdict: pass | concerns` plus at most three one-line findings. Append its reply verbatim to the surface message — it's a head start for the human, not a gate. Do not read any files it cites.
+
 **Surface fidelity is asymmetric** — match what you actually know:
 
 #### Inline branch (you did the work)
@@ -128,7 +130,9 @@ Return to step 3. Continue until all slices are `done`, `blocked`, or `needs-rev
 
 If any slice is `blocked`, `needs-review`, or `in-progress`, do **not** generate QA. Surface the non-done state (slug + status + reason for each) and stop. The user resolves those before QA can run.
 
-When the gate passes:
+When the gate passes, prefer delegating: if the `qa-writer` custom agent is available, spawn it with the feature name and four absolute paths — the tasks file, the log file, this skill's `resources/qa-template.md`, and the output path `docs/{feature}/{feature}.qa.md`. It reads everything in its own context, writes the plan, and replies with the receipt line; relay that to the user and skip to the stop instruction below. This matters most here — your context is heaviest at end-of-run, exactly when this synthesis needs to be careful.
+
+Otherwise, compose inline:
 
 1. Re-read the tasks file once for freshness.
 2. Read the log file in full (`docs/{feature}/{feature}.log.md`).

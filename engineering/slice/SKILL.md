@@ -27,6 +27,8 @@ Look at the conversation context. Is there a clear goal, scope, and rough constr
 
 If you do not yet understand the current shape of the code in the area being changed, look at it now. Skip if the brief is greenfield or you've already explored.
 
+Prefer delegating the exploration to the read-only `Explore` sub-agent: pass the brief and require a map of at most ~30 lines — one finding per line with a `file:line` reference, no file contents. Read a specific file yourself only when a slicing decision turns on its exact contents.
+
 ### 3. Derive the feature slug
 
 Generate a kebab-case slug from the overall plan (e.g. `login-flow`, `checkout-redesign`). Confirm with the user if ambiguous.

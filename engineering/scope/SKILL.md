@@ -13,7 +13,7 @@ Force the user to define the box before they hand work to an agent: what they're
 
 - Ask one question at a time.
 - For each question, provide your recommended answer. Recommend honestly — your job is to *surface* every cuttable branch, not to reflexively recommend cutting it.
-- If a question can be answered by exploring the codebase or project docs, explore instead of asking.
+- If a question can be answered by exploring the codebase or project docs, explore instead of asking. Prefer delegating that exploration to the read-only `Explore` sub-agent: pass the question and require a map of at most ~30 lines — one finding per line with a `file:line` reference, no file contents — so your context stays lean for the grilling. Read a specific file yourself only when the answer turns on its exact contents.
 - If the user defends a requirement convincingly once, accept it and move on. The act of defending crystallizes what's actually needed — you do not need to bully.
 - If `/scope` is invoked with no context at all, ask the user for the brief first, then start pruning.
 - Open the session by telling the user the plan: "Let's start with pruning, then move to the decision tree." Keep the metaphor consistent throughout.

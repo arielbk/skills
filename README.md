@@ -11,6 +11,8 @@ Two kinds of skill, organised by folder:
 - **`engineering/`** — general-purpose dev workflow (planning, slicing work into tasks, TDD-driven implementation).
 - **`personal/`** — my daily-driver workflow, wired to my own stack (Obsidian, Things, Productive, Google Calendar). These read every personal value from a gitignored `config.md`, so fork them and adjust the prose to your own tools.
 
+There's also **`.agents/`** — custom sub-agent definitions the engineering skills use when available (they fall back gracefully when not). See [.agents/README.md](.agents/README.md) for the one-line symlink install.
+
 Browse the folders to see what's there — each skill's `SKILL.md` documents itself, and that's the source of truth (a README list here would just go stale).
 
 ## Install
