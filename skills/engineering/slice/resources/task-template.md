@@ -1,6 +1,6 @@
 # Task Template
 
-Use this template for each slice in `docs/{feature}/{feature}.tasks.md`.
+Use this template for each slice in the feature's `{feature}.tasks.md`.
 
 ---
 

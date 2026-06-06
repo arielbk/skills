@@ -1,11 +1,11 @@
 ---
 name: slice
-description: Break aligned work into vertical tracer-bullet slices with explicit dependencies, outside-in API sketches, and per-slice feedback loops. Writes a docs/{feature}/{feature}.tasks.md DAG agents can work through. Use after /scope, or when the user wants to slice a plan into orchestrate-able tasks. Trigger phrases - "slice this", "break this into tasks", "/slice".
+description: Break aligned work into vertical tracer-bullet slices with explicit dependencies, outside-in API sketches, and per-slice feedback loops. Writes a {feature}.tasks.md DAG to the feature's docs directory for agents to work through. Use after /scope, or when the user wants to slice a plan into orchestrate-able tasks. Trigger phrases - "slice this", "break this into tasks", "/slice".
 ---
 
 # Slice
 
-Turn aligned work into a small DAG of vertical slices in `docs/{feature}/{feature}.tasks.md`. Each slice is end-to-end, has an outside-in API sketch, an explicit feedback loop, and an explicit dependency list — so an agent can pick any unblocked slice and run it.
+Turn aligned work into a small DAG of vertical slices in `{feature}.tasks.md`, written to the feature's docs directory (see step 6 for how that directory is resolved). Each slice is end-to-end, has an outside-in API sketch, an explicit feedback loop, and an explicit dependency list — so an agent can pick any unblocked slice and run it.
 
 This is NOT an issue-tracker tool. Output is a local markdown file the agent updates statuses on as work progresses.
 
@@ -64,23 +64,29 @@ End with a single confirmation prompt: "Look right, or want to adjust anything?"
 
 ### 6. Write the file
 
-Create `docs/{feature}/` if it doesn't exist. If `docs/{feature}/{feature}.tasks.md` already exists, ask before overwriting.
+Resolve the docs directory for this feature:
+
+- **A docs directory for this piece of work has already been provided in the conversation** (e.g. a task-bound docs dir surfaced when the work was scoped or defined) → write the tasks file there as `{feature}.tasks.md`.
+- **Otherwise** → fall back to `docs/{feature}/` under the git root, creating it if it doesn't exist, and write `docs/{feature}/{feature}.tasks.md`.
+
+Do not detect or guess at a location yourself — either one was provided in conversation, or you use the fallback. If the tasks file already exists in the resolved directory, ask before overwriting.
 
 Load [task-template.md](resources/task-template.md) and use it to format each slice consistently.
 
 ### 7. Stop
 
-Tell the user the tasks file is at `docs/{feature}/{feature}.tasks.md`, and that they can run `/implement {feature}` (single orchestrator session) or `/ralph {feature}` (fresh-context loop, one slice per iteration) in a fresh session when ready. Then stop completely — do not offer to implement, offer to start a slice, or suggest what comes next. The user will `/clear` and continue when they're ready.
+Tell the user the tasks file's resolved **absolute path**, and that they can run `/implement {feature}` (single orchestrator session) or `/ralph {feature}` (fresh-context loop, one slice per iteration) in a fresh session when ready. Then stop completely — do not offer to implement, offer to start a slice, or suggest what comes next. The user will `/clear` and continue when they're ready.
 
 ## File structure
 
+All of a feature's planning artifacts live side by side in its resolved docs directory (a provided task docs dir, or the `docs/{feature}/` fallback):
+
 ```
-docs/
-  {feature}/
-    {feature}.tasks.md   ← this skill writes this
-    {feature}.prd.md     ← written by /to-prd
-    {feature}.log.md     ← written by /implement or /ralph
-    {feature}.qa.md      ← written by /implement or /ralph at end
+{docs dir}/
+  {feature}.tasks.md   ← this skill writes this
+  {feature}.prd.md     ← written by /spec
+  {feature}.log.md     ← written by /implement or /ralph
+  {feature}.qa.md      ← written by /implement or /ralph at end
 ```
 
 ## File template
