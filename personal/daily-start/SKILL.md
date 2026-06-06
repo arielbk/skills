@@ -28,6 +28,8 @@ If `Dailies/{date}.md` already exists, read it and skip to step 5 (schedule). Ot
 ### 3. Gather context in parallel
 
 - Read `Areas/Life OS/Day flow.md` — observed scheduling preferences
+- Read `Areas/Career/Career Talk 2026/Performance Goals.md` — work performance goals
+- Read `Areas/Life OS/🔭 Goals.md` — life goals
 - Read yesterday's daily note (Mon: try Sun → Fri → most recent; other days: try yesterday → most recent). Extract `🔮 For Tomorrow` items, unfinished priorities, open Log threads.
 - `mcp__things__get_inbox` — every item (needs triage)
 - `mcp__things__get_today` — items already scheduled for today
@@ -56,6 +58,12 @@ If `Dailies/{date}.md` already exists, read it and skip to step 5 (schedule). Ot
 📅 Work calendar today:
 {events}
 
+🔭 Goals pulse:
+{top 2–3 performance goals, one line each — what you said matters this quarter}
+{top 1–2 life goals, one line each}
+
+→ Does at least one of today's priorities move one of these?
+
 ---
 
 1. What are today's 1–3 priorities?
@@ -79,6 +87,7 @@ Use Day flow as the guide:
 - Schedule the smallest concrete first action per priority, not the abstract goal
 - Leave buffer gaps — do not overbook
 - Include meal/break blocks if Day flow suggests them
+- If none of the stated priorities moves a performance or life goal, add a short goals-push block (15–20m) and flag it: "None of today's priorities touch a goal — I've added a 15m goals-push block; keep it or drop it?"
 - Present as a table. Ask: "Look OK, or want to adjust?"
 
 ### 7. On confirmation, write calendar events
