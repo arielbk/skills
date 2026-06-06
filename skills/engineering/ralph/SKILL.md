@@ -5,7 +5,7 @@ description: Ralph Wiggum loop variant of /implement — drives a feature's task
 
 # Ralph
 
-`/ralph` is an alternate execution mode for `/implement`. Same inputs (`docs/{feature}/{feature}.tasks.md`), same artefacts (`{feature}.log.md`, `{feature}.qa.md`), different runtime: instead of one orchestrator session that does or delegates every slice, a bash loop spawns a fresh sandboxed agent per iteration. Each iteration has its own context, its own quota, and exits after one slice. This trades coherent in-session narration for unbounded total context budget.
+`/ralph` is an alternate execution mode for `/implement`. Same inputs (`{feature}.tasks.md` in the feature's docs directory), same artefacts (`{feature}.log.md`, `{feature}.qa.md` alongside it), different runtime: instead of one orchestrator session that does or delegates every slice, a bash loop spawns a fresh sandboxed agent per iteration. Each iteration has its own context, its own quota, and exits after one slice. This trades coherent in-session narration for unbounded total context budget.
 
 Ralph has two runtimes, both host-native (no Docker, no per-project VM):
 - **Claude (default)** — `ralph.sh`, runs `claude -p` wrapped in [Anthropic's sandbox runtime](https://github.com/anthropic-experimental/sandbox-runtime) (`@anthropic-ai/sandbox-runtime`), which confines the whole process with macOS Seatbelt / Linux bubblewrap. Auth comes from the host's existing Claude login — no in-sandbox `/login`.
@@ -31,35 +31,52 @@ Strip `codex` from the args before extracting the feature name. The remaining po
 
 ### 2. Identify the feature
 
-**Argument passed** → look for `docs/{feature}/{feature}.tasks.md`. If missing, tell the user and stop.
+**Argument passed** → resolve the feature's docs directory:
 
-**No argument** → scan `docs/` for directories containing `{name}.tasks.md` and ask the user which one.
+- **A docs directory for this piece of work has already been provided in the conversation** (e.g. a task-bound docs dir surfaced when the work was scoped, defined, or re-entered) → look for `{feature}.tasks.md` there.
+- **Otherwise** → look for `docs/{feature}/{feature}.tasks.md` under the git root.
+
+If the tasks file is missing, tell the user and stop. Do not detect or guess at other locations.
+
+**No argument** → discover candidates: if a task layer is bound to this session (something in the conversation has been surfacing task docs directories), list its tasks and check their docs dirs for a `{name}.tasks.md`; otherwise scan `docs/` under the git root. Ask the user which one.
+
+Once resolved, fix the absolute paths for the run — all siblings in the docs dir: `{docs dir}/{feature}.tasks.md`, `{docs dir}/{feature}.log.md`, `{docs dir}/{feature}.qa.md`.
 
 ### 3. Preflight
 
 Always check:
-- `docs/{feature}/{feature}.tasks.md` exists.
+- The resolved `{feature}.tasks.md` exists.
 - `jq` is on PATH. Both scripts pipe each iteration's JSON stream through `jq` to extract a structured per-iteration result; without it the loop aborts immediately.
 - The repo is a git repo with a clean-ish tree (uncommitted changes are fine, but warn the user — each iteration commits).
 
 Claude runtime only:
 - The sandbox runtime is reachable: either `srt` is on PATH or `npx` is (the script falls back to `npx -y @anthropic-ai/sandbox-runtime`, which fetches+caches the package on first use). If neither is present, tell the user to `npm i -g @anthropic-ai/sandbox-runtime` and stop.
 - `claude` is on PATH and the **host** is already logged in (`claude -p 'say hi'` works). The sandbox runs on the host and reuses host credentials — there is no separate sandbox login. ralph.sh runs a one-shot `READY` probe through the sandbox before iterating, so a logged-out host or a broken sandbox launch fails during preflight, not on iteration 1.
-- Sandbox policy is generated per-run and scoped to this repo (repo dir + the active Claude config dir — `$CLAUDE_CONFIG_DIR`, defaulting to `~/.claude` — writable, `*.anthropic.com` network). If a slice's feedback loop needs more (e.g. a package registry to install deps), point `RALPH_SRT_SETTINGS` at your own settings file — see the sandbox-runtime README for the schema.
+- Sandbox policy is generated per-run and scoped to this run (repo dir + the active Claude config dir — `$CLAUDE_CONFIG_DIR`, defaulting to `~/.claude` — + the feature's docs dir writable, `*.anthropic.com` network), plus any extra directories passed via `RALPH_EXTRA_DIRS` (see step 4). If a slice's feedback loop needs more than extra directories (e.g. a package registry to install deps), point `RALPH_SRT_SETTINGS` at your own settings file — see the sandbox-runtime README for the schema. `RALPH_SRT_SETTINGS` replaces the whole generated file, so it must include any extra dirs itself (`RALPH_EXTRA_DIRS` is ignored with a warning).
 
 Codex runtime only:
 - `codex` is on PATH. Auth is not pre-checked — `codex exec` fails loudly on iteration 1 if the user is not logged in (`codex login`).
 
 ### 4. Run the loop
 
-Invoke the runtime's bundled script via Bash:
+First assemble the directories the iterations need:
+
+- **Docs dir** — when the resolved docs dir is not the in-repo default (`docs/{feature}/`), pass it as `RALPH_DOCS_DIR`. The scripts derive the tasks/log paths from it **and grant it to the sandbox automatically** — never repeat it elsewhere.
+- **Extra writable roots** — only for genuinely additional directories (reference projects the user named): pass them as a colon-separated list of absolute paths in `RALPH_EXTRA_DIRS`. The repo and the docs dir are always granted; don't list them. A writable root is also readable, so this covers read-only reference projects too. Omit the variable when there are none.
+
+Then invoke the runtime's bundled script via Bash (run from the repo root — the scripts take the repo from `pwd`):
 
 ```
-# Claude (default)
+# Claude (default) — in-repo docs dir, no extras
 bash {skill-dir}/ralph.sh {feature} {max-iterations}
 
-# Codex
-bash {skill-dir}/ralph-codex.sh {feature} {max-iterations}
+# Claude — out-of-repo docs dir + a reference project
+RALPH_DOCS_DIR=/abs/docs-dir RALPH_EXTRA_DIRS=/abs/reference \
+  bash {skill-dir}/ralph.sh {feature} {max-iterations}
+
+# Codex — same variables, same meaning
+RALPH_DOCS_DIR=/abs/docs-dir RALPH_EXTRA_DIRS=/abs/reference \
+  bash {skill-dir}/ralph-codex.sh {feature} {max-iterations}
 ```
 
 Default `max-iterations` to `30` unless the user passed an explicit cap. Stream the output. Both scripts:
@@ -77,7 +94,7 @@ Do not babysit individual iterations. Just let the script run and capture its ex
 
 ### 5. Generate the QA plan (only on clean completion)
 
-**Only** if the loop exited `0` with `COMPLETE` in output: spawn one final agent (same runtime that ran the loop — `claude -p` for the Claude path, `codex exec` for the Codex path) using the prompt template in [resources/qa-prompt.md](resources/qa-prompt.md). This agent reads `{feature}.tasks.md` + `{feature}.log.md` and writes `docs/{feature}/{feature}.qa.md` in the same shape `/implement` produces.
+**Only** if the loop exited `0` with `COMPLETE` in output: spawn one final agent (same runtime that ran the loop — `claude -p` for the Claude path, `codex exec` for the Codex path) using the prompt template in [resources/qa-prompt.md](resources/qa-prompt.md). Render its placeholders with the resolved absolute paths — `{{FEATURE}}`, `{{TASKS_FILE}}`, `{{LOG_FILE}}`, and `{{QA_FILE}}` (= `{docs dir}/{feature}.qa.md`). This agent reads the tasks file + log and writes the QA plan in the same shape `/implement` produces.
 
 For any other exit (STUCK at exit `76`, iteration cap at exit `75`, or anything else), do **not** generate QA. Instead, surface the current state of `{feature}.tasks.md` (slug + `Status:` for each slice) so the user can intervene. If the exit was STUCK, also surface the STUCK reason from the final iteration's stdout verbatim.
 

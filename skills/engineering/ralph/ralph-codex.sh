@@ -24,12 +24,41 @@ SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROMPT_TEMPLATE="$SKILL_DIR/resources/iteration-prompt.md"
 
 REPO_ROOT="$(pwd)"
-TASKS_FILE="$REPO_ROOT/docs/$FEATURE/$FEATURE.tasks.md"
-LOG_FILE="$REPO_ROOT/docs/$FEATURE/$FEATURE.log.md"
+# The feature's docs dir defaults to the in-repo convention; the orchestrator
+# overrides it (RALPH_DOCS_DIR) when the feature's artifacts live elsewhere.
+# Tasks/log paths always derive from it.
+DOCS_DIR="${RALPH_DOCS_DIR:-$REPO_ROOT/docs/$FEATURE}"
+TASKS_FILE="$DOCS_DIR/$FEATURE.tasks.md"
+LOG_FILE="$DOCS_DIR/$FEATURE.log.md"
 
 if [ ! -f "$TASKS_FILE" ]; then
   echo "ralph-codex: tasks file not found at $TASKS_FILE" >&2
   exit 66
+fi
+
+# Extra writable sandbox roots. The docs dir is granted automatically — the
+# iterations must write the tasks/log files wherever they live (a harmless
+# duplicate when it's the in-repo default). The orchestrator passes
+# RALPH_EXTRA_DIRS (colon-separated absolute paths) only for genuinely
+# additional dirs, e.g. reference projects. A writable root is also readable.
+# Empty-array expansion is guarded for bash 3.2 (macOS default).
+EXTRA_DIRS=("$DOCS_DIR")
+if [ -n "${RALPH_EXTRA_DIRS:-}" ]; then
+  IFS=':' read -r -a USER_DIRS <<< "$RALPH_EXTRA_DIRS"
+  for d in ${USER_DIRS[@]+"${USER_DIRS[@]}"}; do
+    case "$d" in
+      /*) ;;
+      *)
+        echo "ralph-codex: RALPH_EXTRA_DIRS entries must be absolute paths: $d" >&2
+        exit 64
+        ;;
+    esac
+    if [ ! -d "$d" ]; then
+      echo "ralph-codex: RALPH_EXTRA_DIRS entry is not a directory: $d" >&2
+      exit 66
+    fi
+    EXTRA_DIRS+=("$d")
+  done
 fi
 
 if [ ! -f "$PROMPT_TEMPLATE" ]; then
@@ -74,6 +103,14 @@ render_prompt() {
 
 PROMPT="$(render_prompt)"
 
+# writable_roots re-adds .git (workspace-write hardcodes it read-only — see the
+# pipeline comment below) plus the docs dir and every RALPH_EXTRA_DIRS entry.
+WRITABLE_ROOTS="[\"$REPO_ROOT/.git\""
+for d in ${EXTRA_DIRS[@]+"${EXTRA_DIRS[@]}"}; do
+  WRITABLE_ROOTS="$WRITABLE_ROOTS,\"$d\""
+done
+WRITABLE_ROOTS="$WRITABLE_ROOTS]"
+
 for ((i = 1; i <= MAX_ITERATIONS; i++)); do
   echo "─── ralph-codex iteration $i / $MAX_ITERATIONS ───"
 
@@ -97,7 +134,7 @@ for ((i = 1; i <= MAX_ITERATIONS; i++)); do
   # iteration STUCKs on commit.
   # </dev/null prevents codex's stdin-readback from blocking.
   if ! codex exec --json --skip-git-repo-check -s workspace-write \
-        -c "sandbox_workspace_write.writable_roots=[\"$REPO_ROOT/.git\"]" \
+        -c "sandbox_workspace_write.writable_roots=$WRITABLE_ROOTS" \
         "$PROMPT" </dev/null 2>&1 \
       | tee "$raw_file" \
       | grep --line-buffered '^{' \

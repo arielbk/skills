@@ -9,7 +9,7 @@ You are the final agent in a Ralph run for the **{{FEATURE}}** feature. The loop
 
 ## Your job
 
-Compose `docs/{{FEATURE}}/{{FEATURE}}.qa.md` per `qa-template.md`. Split items into:
+Compose the QA plan at `{{QA_FILE}}` per `qa-template.md`. Split items into:
 
 - **Already verified by the agent** (checked, near the top) — tests, typechecks, lints, builds, CLI smoke checks that prior iterations actually ran. Pull these from log entries. Each gets a `- [x]` and a one-line result.
 - **Human verification required** (unchecked) — every slice left at `Status: needs-review`, plus any slice with `Human checkpoint: yes` in the tasks file, plus anything needing a browser, device, or human judgement. A `needs-review` slice is the loop signalling it could not self-verify a runtime gate — name it explicitly here. Write each item as a self-contained runbook, not a vague instruction: exact command + working dir, exact entry point (full URL incl. port, screen, or CLI invocation), concrete steps, and pass criterion. Pull the real run command and port from the repo's run config (read #4 above); never write "open the local web app" without saying how. Put commands shared by several items in a single **Setup** block at the top of the section per `qa-template.md`.
