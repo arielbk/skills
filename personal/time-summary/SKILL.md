@@ -25,6 +25,7 @@ Parse the `📓 Log` section of a daily note, calculate total work hours, apply 
    - Multiple start/end pairs (split shift): calculate each session separately, then sum.
    - **Lunch benefit**: if work time is **≥ 5h30m** (greater than *or equal to* — at exactly 5h30m the benefit applies), add 30 minutes to total billable time. Note it explicitly in the summary.
    - **Round** the final billable total to the nearest 15 minutes.
+   - **Every individual entry must also land on a 15-minute boundary** — never log a raw figure like 1h54m or 41m. Round each component to the nearest 15 min, then adjust so the components still sum to the rounded billable total: absorb the leftover into the main/preferred project (usually the largest block). See Rounding below.
 
 4. Extract what was worked on:
    - Group activity descriptions into themes by project (use Slack threads, schedule, and log context)
@@ -76,8 +77,13 @@ Proposed split:
 
 ## Rounding
 
-Round the final billable total to the nearest 15 minutes:
-- e.g. 6h18m → 6h15m, 6h23m → 6h30m, 5h48m → 5h45m
+**Everything is rounded to the nearest 15 minutes — both the total and every logged entry.** Never log a raw figure.
+
+1. Round the final billable total to the nearest 15 minutes:
+   - e.g. 6h18m → 6h15m, 6h23m → 6h30m, 5h48m → 5h45m
+2. Round each per-project component to the nearest 15 minutes.
+3. The components must sum to the rounded total. If rounding the components leaves a remainder, absorb it into the main/preferred project (usually the largest block) so the split reconciles.
+   - e.g. total 7h45m; raw split AI 1h54m / HR 41m / BMO 5h10m → AI **2h00m**, HR **45m**, BMO takes the remainder = **5h00m** (not 5h15m), summing to 7h45m.
 
 ## Break detection
 
