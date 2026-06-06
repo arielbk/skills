@@ -45,7 +45,7 @@ Always check:
 Claude runtime only:
 - The sandbox runtime is reachable: either `srt` is on PATH or `npx` is (the script falls back to `npx -y @anthropic-ai/sandbox-runtime`, which fetches+caches the package on first use). If neither is present, tell the user to `npm i -g @anthropic-ai/sandbox-runtime` and stop.
 - `claude` is on PATH and the **host** is already logged in (`claude -p 'say hi'` works). The sandbox runs on the host and reuses host credentials — there is no separate sandbox login. ralph.sh runs a one-shot `READY` probe through the sandbox before iterating, so a logged-out host or a broken sandbox launch fails during preflight, not on iteration 1.
-- Sandbox policy is generated per-run and scoped to this repo (repo dir + `~/.claude` writable, `*.anthropic.com` network). If a slice's feedback loop needs more (e.g. a package registry to install deps), point `RALPH_SRT_SETTINGS` at your own settings file — see the sandbox-runtime README for the schema.
+- Sandbox policy is generated per-run and scoped to this repo (repo dir + the active Claude config dir — `$CLAUDE_CONFIG_DIR`, defaulting to `~/.claude` — writable, `*.anthropic.com` network). If a slice's feedback loop needs more (e.g. a package registry to install deps), point `RALPH_SRT_SETTINGS` at your own settings file — see the sandbox-runtime README for the schema.
 
 Codex runtime only:
 - `codex` is on PATH. Auth is not pre-checked — `codex exec` fails loudly on iteration 1 if the user is not logged in (`codex login`).

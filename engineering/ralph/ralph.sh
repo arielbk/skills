@@ -81,10 +81,18 @@ if [ -n "${RALPH_SRT_SETTINGS:-}" ]; then
 else
   SRT_SETTINGS="$(mktemp -t ralph-srt-settings.XXXXXX.json)"
   CLEANUP_SETTINGS=1
+  # Honor a host-set CLAUDE_CONFIG_DIR (e.g. ~/.claude-infinum); the inner claude
+  # writes session state (session-env/<uuid>, etc.) there, not under ~/.claude.
+  CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
   # sandbox-runtime v0.0.52 validates a nested filesystem/network schema and
   # requires every key present; the obsolete flat shape is rejected, which
-  # collapses to deny-all and kills the probe. /tmp + /var/folders cover temp
-  # writes on both Linux and macOS (where TMPDIR lives under /var/folders).
+  # collapses to deny-all and kills the probe. The temp-dir entries cover temp
+  # writes on both Linux and macOS (where TMPDIR lives under /var/folders), and
+  # macOS Seatbelt evaluates RESOLVED paths — /tmp and /var/folders are symlinks
+  # into /private, so the /private/* twins must be listed too or claude's Bash
+  # mkdirs under /private/tmp/claude-<uid>/… get EPERM. We also list both
+  # CLAUDE_DIR and ~/.claude (harmless duplicate when CLAUDE_CONFIG_DIR is unset;
+  # the CLI still reads ~/.claude.json for creds per the header comment).
   cat > "$SRT_SETTINGS" <<JSON
 {
   "filesystem": {
@@ -92,10 +100,14 @@ else
     "allowRead": [],
     "allowWrite": [
       "$REPO_ROOT",
+      "$CLAUDE_DIR",
+      "$CLAUDE_DIR.json",
       "$HOME/.claude",
       "$HOME/.claude.json",
       "/tmp",
-      "/var/folders"
+      "/private/tmp",
+      "/var/folders",
+      "/private/var/folders"
     ],
     "denyWrite": []
   },
@@ -110,7 +122,7 @@ else
   }
 }
 JSON
-  echo "ralph: generated sandbox settings at $SRT_SETTINGS (repo + ~/.claude writable; *.anthropic.com network)" >&2
+  echo "ralph: generated sandbox settings at $SRT_SETTINGS (repo + claude config writable; *.anthropic.com network)" >&2
 fi
 
 # An `if` block, not `[ … ] && rm`: the && form returns 1 when the condition
