@@ -1,48 +1,44 @@
 ---
 name: setup
-description: Interactively bootstrap config for skills that ship a config.example.md. Detects the user's Claude config home(s), then for each such skill walks every field, prompts the user for a value, and writes a filled config.md — no hand-editing. Use when the user says "/setup", "set up the skills", "configure the personal skills", or has just installed this repo's skills and needs config.md filled in.
+description: Interactively bootstrap the gitignored config.md that the personal skills read (timezone, calendar IDs, Productive person ID). Ships its own config.example.md and writes config.md to the shared skills root. Use when the user says "/setup", "set up the skills", "configure the personal skills", or has just installed this repo's skills and needs config.md filled in.
 ---
 
 # Setup
 
-Bootstrap the gitignored `config.md` that personal skills read for their values. The installer (`npx skills add`) puts skill files on the machine; this skill owns config only.
+Bootstrap the `config.md` that the personal skills read for their values (timezone, calendar IDs, Productive person ID). The installer (`npx skills add`) flattens each skill into `<claude-home>/skills/<name>`, so this skill **ships its own `config.example.md`** and writes `config.md` to the shared **skills root** — the directory the personal skills reach via `../config.md`.
 
-The logic keys off the presence of a `config.example.md` next to a skill, so it works for any skill group that ships one — today that's `personal/`.
+## Why config lives at the skills root
+
+Each personal skill reads `../config.md` relative to its own directory. After install every skill is a direct child of `<claude-home>/skills/`, so that resolves to **`<claude-home>/skills/config.md`** — the single target this skill writes. `config.example.md` is bundled inside this `setup/` skill so it always installs alongside it — never search the tree for it.
+
+> Compute the target as the absolute path `<claude-home>/skills/config.md`, not as `../config.md` from this skill's own directory. When skills are installed as symlinks, the `setup` symlink and the personal-skill symlinks can point at different source folders, so a physically-resolved `..` from `setup` may land somewhere other than the skills root. The absolute skills-root path is unambiguous; that's where every personal skill's lexical `../config.md` lands.
 
 ## Steps
 
-### 1. Detect config home(s)
+### 1. Locate this skill and its example
 
-Look for Claude config directories the installed skills could live under:
+- This skill's directory is the base directory shown when the skill is invoked (e.g. `~/.claude/skills/setup`).
+- The example is `config.example.md` in that directory. Read it — it's the field source of truth.
+- The **target** is `../config.md` relative to this skill's directory (i.e. the skills root, `<claude-home>/skills/config.md`).
+
+### 2. Detect other config homes (optional)
+
+Some users keep more than one Claude home:
 
 ```bash
 ls -d ~/.claude ~/.claude-* 2>/dev/null
 ```
 
-- If exactly one exists, use it.
-- If more than one (e.g. `~/.claude` and a sibling like `~/.claude-work`), ask the user which to target — offer "all of them" as an option.
-- If none of the candidate skill locations contain a `config.example.md`, fall back to this repo's own checkout (the directory this skill lives in).
+For any sibling home that also has `skills/setup/config.example.md`, its target is `<home>/skills/config.md`. If more than one home has the skills installed, ask which to target — offer "all of them". The same answers fill every target.
 
-### 2. Find skills that ship a config.example.md
+### 3. Decide what to write (per target)
 
-In each target location, find every `config.example.md`:
-
-```bash
-find <target> -name config.example.md -not -path '*/node_modules/*'
-```
-
-Each hit is one config group. Process each independently.
-
-### 3. For each group, decide what to write
-
-Let `example` be the `config.example.md` and `config` be `config.md` in the same directory.
-
-- **`config.md` absent** → bootstrap it from scratch (step 4, all fields).
-- **`config.md` present** → never overwrite. Read it, diff its fields against `example`, and only prompt for fields that are missing or still hold the example placeholder. If nothing is missing, report that it's already complete and move on.
+- **target `config.md` absent** → bootstrap it from scratch (step 4, all fields).
+- **target present (regular file _or_ symlink)** → never overwrite, never replace a symlink. Read its current values, diff against the example, and only prompt for fields that are missing or still hold the example placeholder. If nothing is missing, report it's already complete and move on.
 
 ### 4. Walk the fields interactively
 
-Read `example`. Each field is a markdown bullet of the form:
+Each example field is a markdown bullet:
 
 ```
 - **Label**: `placeholder` (optional one-line hint)
@@ -52,20 +48,20 @@ For each field that needs a value:
 
 1. Show the label, the hint, and the placeholder as the default.
 2. Ask the user for the value in chat (free-form). Use `AskUserQuestion` only when a small set of choices genuinely applies; otherwise just ask plainly and read the reply.
-3. Keep the user's section headings and structure identical to `example`.
+3. Keep the example's section headings and field labels identical.
 
 ### 5. Write config.md
 
-Write `config.md` next to its `config.example.md`, mirroring the example's structure exactly (same headings, same field labels), with the placeholder values replaced by the user's answers. Preserve any inline hints as-is.
+Write the target `config.md`, mirroring the example's structure exactly (same headings, same field labels), with the placeholder values replaced by the user's answers. Preserve any inline hints as-is. If the target is a symlink, write **through** it — do not unlink or replace it with a regular file.
 
-`config.md` is gitignored — confirm it's covered by `.gitignore` and never stage it.
+`config.md` is user-local and gitignored — never stage or commit it.
 
 ### 6. Report
 
-Summarise per group: path written, fields filled, fields skipped (already set). If you targeted multiple config homes, note each.
+Summarise per target: path written, fields filled, fields skipped (already set). If you wrote to more than one home, note each.
 
 ## Notes
 
 - Idempotent: re-running never clobbers an existing `config.md`; it only fills gaps.
-- Never commit or stage `config.md`.
+- `config.example.md` ships with this skill and is committed; `config.md` is user-local — never commit or stage it.
 - Do not invent values — every field comes from the user's answer or the existing file.
