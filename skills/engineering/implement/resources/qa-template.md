@@ -1,6 +1,6 @@
 # QA Plan Template
 
-Write `docs/{feature}/{feature}.qa.md` after all slices are complete. Read `{feature}.tasks.md` and `{feature}.log.md` before writing.
+Write `{feature}.qa.md` next to the feature's tasks file after all slices are complete. Read `{feature}.tasks.md` and `{feature}.log.md` before writing.
 
 ## Structure
 

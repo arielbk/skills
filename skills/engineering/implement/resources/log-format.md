@@ -1,6 +1,6 @@
 # Log Entry Format
 
-Append one entry to `docs/{feature}/{feature}.log.md` after completing each slice.
+Append one entry to the feature's `{feature}.log.md` (sibling of the tasks file) after completing each slice.
 
 The log is a running, append-only record. Under `/ralph`, each iteration runs in a fresh context with no memory of the prior one — the log is the **only** channel through which one iteration hands off to the next. Write entries so a fresh agent (or a human catching up) can read top-to-bottom and reconstruct what's been decided and what's still load-bearing.
 
