@@ -22,7 +22,7 @@ Verify with `/agents` (Library tab) in any session.
 
 ## Sync
 
-`slice-agent.md` doubles as the system-prompt form of `engineering/implement/resources/slice-prompt.md`, which the `/implement` skill uses as a fallback when the agent isn't installed. Edit both or neither.
+`slice-agent.md` doubles as the system-prompt form of `skills/engineering/implement/resources/slice-prompt.md`, which the `/implement` skill uses as a fallback when the agent isn't installed. Edit both or neither.
 
 ## Design rule
 
