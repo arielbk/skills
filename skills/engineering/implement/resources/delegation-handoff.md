@@ -22,8 +22,8 @@ Do not delegate just because the slice "feels big" or "feels risky." Inline give
 
 Resolve these absolute paths first:
 
-- `TASKS_PATH` = `docs/{feature}/{feature}.tasks.md`
-- `LOG_PATH` = `docs/{feature}/{feature}.log.md`
+- `TASKS_PATH` = the resolved tasks file (`{docs dir}/{feature}.tasks.md` from step 1 of the skill)
+- `LOG_PATH` = its sibling log file (`{docs dir}/{feature}.log.md`)
 - `TDD_LOOP_PATH` = absolute path to this skill's `resources/tdd-loop.md`
 - `LOG_FORMAT_PATH` = absolute path to this skill's `resources/log-format.md`
 - `SLICE_PROMPT_PATH` = absolute path to this skill's `resources/slice-prompt.md` (fallback path only)

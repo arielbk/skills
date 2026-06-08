@@ -67,12 +67,14 @@ If — and only if — no slice is pickable because every unsettled slice is gen
 
 ## Commit
 
-Stage the code changes, the tasks-file edit, and the log entry, then create one commit:
+Stage the repo changes — the code, plus the tasks-file edit and log entry when those files live inside the repo — then create one commit:
 
 ```
 git add -A
 git commit -m "ralph: {slice-slug}"
 ```
+
+The tasks file and log may live **outside** the repo (you were given absolute paths; compare them against the repo root). Out-of-repo artifacts are intentionally not git-committed — never try to add them. If the slice produced no in-repo changes at all, skip the commit and move on.
 
 If the commit fails (pre-commit hook, etc.), fix the underlying issue and commit again. Do not skip hooks.
 

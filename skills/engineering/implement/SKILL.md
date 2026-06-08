@@ -1,11 +1,11 @@
 ---
 name: implement
-description: Execute a feature's task slices end-to-end using TDD, writing a log as it goes and generating a QA plan at the end. Reads docs/{feature}/{feature}.tasks.md. Use when user says "/implement", "implement this", or "start building". Pass the feature name as an argument, e.g. /implement checkout-flow.
+description: Execute a feature's task slices end-to-end using TDD, writing a log as it goes and generating a QA plan at the end. Reads {feature}.tasks.md from the feature's docs directory. Use when user says "/implement", "implement this", or "start building". Pass the feature name as an argument, e.g. /implement checkout-flow.
 ---
 
 # Implement
 
-Execute a feature's slice DAG from `docs/{feature}/{feature}.tasks.md` **sequentially** in one orchestrator session. Run each unblocked slice one at a time, keep a running log, and generate a QA plan when done. The orchestrator does slice work inline by default and may delegate individual slices to fresh sub-agents when that's cheaper for context.
+Execute a feature's slice DAG from `{feature}.tasks.md` in the feature's docs directory (resolved in step 1) **sequentially** in one orchestrator session. Run each unblocked slice one at a time, keep a running log, and generate a QA plan when done. The orchestrator does slice work inline by default and may delegate individual slices to fresh sub-agents when that's cheaper for context.
 
 `/implement` is the **interactive** runner: a human is present, so it pauses at every `needs-review` slice (step 6) for real-time review. Its AFK sibling `/ralph` runs the same DAG unattended in a sandboxed loop — it never pauses for a human; it settles `needs-review` slices and defers all human checks to the QA plan. Use `/implement` when you want to be in the loop; use `/ralph` to let it simmer and come back to a QA plan.
 
@@ -26,9 +26,19 @@ Execute a feature's slice DAG from `docs/{feature}/{feature}.tasks.md` **sequent
 
 ### 1. Identify the feature
 
-**If a feature name was passed as an argument** → look for `docs/{feature}/{feature}.tasks.md`. If not found, tell the user.
+**If a feature name was passed as an argument** → resolve its docs directory:
 
-**If no argument was given** → scan `docs/` for directories containing a `{name}.tasks.md` file and present the options:
+- **A docs directory for this piece of work has already been provided in the conversation** (e.g. a task-bound docs dir surfaced when the work was scoped, defined, or re-entered) → look for `{feature}.tasks.md` there.
+- **Otherwise** → look for `docs/{feature}/{feature}.tasks.md` under the git root.
+
+If the tasks file isn't found, tell the user. Do not detect or guess at other locations.
+
+**If no argument was given** → discover candidates:
+
+- **If a task layer is bound to this session** (something in the conversation has been surfacing task docs directories) → list its tasks and check each task's docs dir for a `{name}.tasks.md`.
+- **Otherwise** → scan `docs/` under the git root for directories containing a `{name}.tasks.md` file.
+
+Present the options:
 
 ```
 Available features:
@@ -38,9 +48,15 @@ Available features:
 Which would you like to implement?
 ```
 
+Once resolved, fix three absolute paths for the rest of the run — all siblings in the same docs directory:
+
+- `TASKS_PATH` = `{docs dir}/{feature}.tasks.md`
+- `LOG_PATH` = `{docs dir}/{feature}.log.md`
+- `QA_PATH` = `{docs dir}/{feature}.qa.md`
+
 ### 2. Read the tasks file
 
-Load `docs/{feature}/{feature}.tasks.md`. Parse all slices, their statuses, and their `Depends on:` fields.
+Load `TASKS_PATH`. Parse all slices, their statuses, and their `Depends on:` fields.
 
 ### 3. Pick the next unblocked slice
 
@@ -71,7 +87,7 @@ Don't delegate to offload hard problems. Inline keeps the orchestrator close to 
 4. Work the red→green→refactor loop — one behaviour, one test, one implementation, repeat.
 5. Never reference the PRD, tasks file, or any planning document in code comments.
 6. When the feedback loop passes and code is clean, set `Status:` to `done` (or `needs-review` if `Human checkpoint: yes` or you self-flag uncertainty).
-7. Append a log entry per [log-format.md](resources/log-format.md) to `docs/{feature}/{feature}.log.md` (create the file if it doesn't exist).
+7. Append a log entry per [log-format.md](resources/log-format.md) to `LOG_PATH` (create the file if it doesn't exist).
 
 If the slice is `needs-review`, go to step 6. Otherwise return to step 3.
 
@@ -130,14 +146,14 @@ Return to step 3. Continue until all slices are `done`, `blocked`, or `needs-rev
 
 If any slice is `blocked`, `needs-review`, or `in-progress`, do **not** generate QA. Surface the non-done state (slug + status + reason for each) and stop. The user resolves those before QA can run.
 
-When the gate passes, prefer delegating: if the `qa-writer` custom agent is available, spawn it with the feature name and four absolute paths — the tasks file, the log file, this skill's `resources/qa-template.md`, and the output path `docs/{feature}/{feature}.qa.md`. It reads everything in its own context, writes the plan, and replies with the receipt line; relay that to the user and skip to the stop instruction below. This matters most here — your context is heaviest at end-of-run, exactly when this synthesis needs to be careful.
+When the gate passes, prefer delegating: if the `qa-writer` custom agent is available, spawn it with the feature name and four absolute paths — `TASKS_PATH`, `LOG_PATH`, this skill's `resources/qa-template.md`, and the output path `QA_PATH`. It reads everything in its own context, writes the plan, and replies with the receipt line; relay that to the user and skip to the stop instruction below. This matters most here — your context is heaviest at end-of-run, exactly when this synthesis needs to be careful.
 
 Otherwise, compose inline:
 
 1. Re-read the tasks file once for freshness.
-2. Read the log file in full (`docs/{feature}/{feature}.log.md`).
+2. Read the log file in full (`LOG_PATH`).
 3. Load [qa-template.md](resources/qa-template.md).
-4. Compose `docs/{feature}/{feature}.qa.md` per the template. Split items into two halves:
+4. Compose the QA plan at `QA_PATH` per the template. Split items into two halves:
    - **Already verified by the agent** (checked, near the top) — tests, linters, typechecks, builds, CLI smoke checks the agent actually ran during implementation. Pull these from the log. Each gets a `- [x]` with a one-line result.
    - **Human verification required** (unchecked) — slices with `Human checkpoint: yes`, plus anything needing a browser, device, or human judgement. Write each as a self-contained runbook: exact command + working dir, exact entry point (URL incl. port, screen, CLI invocation), concrete steps, and pass criterion. The human lacks your context — never leave them to figure out how to start the app or which port it's on. Pull the real run command and port from `package.json` scripts, Makefile, README, or compose files (read them now if you didn't during the run); never invent them.
    - **Watch closely** — log entries with non-empty `Deviations:` or unusual `Notes:`.
@@ -145,7 +161,7 @@ Otherwise, compose inline:
 5. Tell the user the path:
 
    ```
-   QA plan written: {absolute path to docs/{feature}/{feature}.qa.md}
+   QA plan written: {QA_PATH}
    ```
 
    Then **stop completely**. Do not offer to walk through the plan, run any checks, suggest a next feature or slice, or ask if the user wants anything else. The user will `/clear` when ready.

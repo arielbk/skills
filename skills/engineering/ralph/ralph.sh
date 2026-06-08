@@ -29,12 +29,41 @@ SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROMPT_TEMPLATE="$SKILL_DIR/resources/iteration-prompt.md"
 
 REPO_ROOT="$(pwd)"
-TASKS_FILE="$REPO_ROOT/docs/$FEATURE/$FEATURE.tasks.md"
-LOG_FILE="$REPO_ROOT/docs/$FEATURE/$FEATURE.log.md"
+# The feature's docs dir defaults to the in-repo convention; the orchestrator
+# overrides it (RALPH_DOCS_DIR) when the feature's artifacts live elsewhere.
+# Tasks/log paths always derive from it.
+DOCS_DIR="${RALPH_DOCS_DIR:-$REPO_ROOT/docs/$FEATURE}"
+TASKS_FILE="$DOCS_DIR/$FEATURE.tasks.md"
+LOG_FILE="$DOCS_DIR/$FEATURE.log.md"
 
 if [ ! -f "$TASKS_FILE" ]; then
   echo "ralph: tasks file not found at $TASKS_FILE" >&2
   exit 66
+fi
+
+# Extra writable sandbox roots. The docs dir is granted automatically — the
+# iterations must write the tasks/log files wherever they live (a harmless
+# duplicate when it's the in-repo default). The orchestrator passes
+# RALPH_EXTRA_DIRS (colon-separated absolute paths) only for genuinely
+# additional dirs, e.g. reference projects. A writable root is also readable.
+# Empty-array expansion is guarded for bash 3.2 (macOS default).
+EXTRA_DIRS=("$DOCS_DIR")
+if [ -n "${RALPH_EXTRA_DIRS:-}" ]; then
+  IFS=':' read -r -a USER_DIRS <<< "$RALPH_EXTRA_DIRS"
+  for d in ${USER_DIRS[@]+"${USER_DIRS[@]}"}; do
+    case "$d" in
+      /*) ;;
+      *)
+        echo "ralph: RALPH_EXTRA_DIRS entries must be absolute paths: $d" >&2
+        exit 64
+        ;;
+    esac
+    if [ ! -d "$d" ]; then
+      echo "ralph: RALPH_EXTRA_DIRS entry is not a directory: $d" >&2
+      exit 66
+    fi
+    EXTRA_DIRS+=("$d")
+  done
 fi
 
 if [ ! -f "$PROMPT_TEMPLATE" ]; then
@@ -78,6 +107,9 @@ if [ -n "${RALPH_SRT_SETTINGS:-}" ]; then
   SRT_SETTINGS="$RALPH_SRT_SETTINGS"
   CLEANUP_SETTINGS=0
   echo "ralph: using sandbox settings from \$RALPH_SRT_SETTINGS ($SRT_SETTINGS)" >&2
+  if [ -n "${RALPH_DOCS_DIR:-}" ] || [ -n "${RALPH_EXTRA_DIRS:-}" ]; then
+    echo "ralph: warning — RALPH_SRT_SETTINGS replaces the whole settings file; the docs dir and RALPH_EXTRA_DIRS are NOT auto-granted. Your settings file's allowWrite must include them." >&2
+  fi
 else
   SRT_SETTINGS="$(mktemp -t ralph-srt-settings.XXXXXX.json)"
   CLEANUP_SETTINGS=1
@@ -93,6 +125,12 @@ else
   # mkdirs under /private/tmp/claude-<uid>/… get EPERM. We also list both
   # CLAUDE_DIR and ~/.claude (harmless duplicate when CLAUDE_CONFIG_DIR is unset;
   # the CLI still reads ~/.claude.json for creds per the header comment).
+  # RALPH_EXTRA_DIRS entries are spliced in as additional allowWrite roots.
+  EXTRA_WRITE_JSON=""
+  for d in ${EXTRA_DIRS[@]+"${EXTRA_DIRS[@]}"}; do
+    EXTRA_WRITE_JSON="$EXTRA_WRITE_JSON,
+      \"$d\""
+  done
   cat > "$SRT_SETTINGS" <<JSON
 {
   "filesystem": {
@@ -107,7 +145,7 @@ else
       "/tmp",
       "/private/tmp",
       "/var/folders",
-      "/private/var/folders"
+      "/private/var/folders"$EXTRA_WRITE_JSON
     ],
     "denyWrite": []
   },
@@ -122,7 +160,11 @@ else
   }
 }
 JSON
-  echo "ralph: generated sandbox settings at $SRT_SETTINGS (repo + claude config writable; *.anthropic.com network)" >&2
+  extra_note=""
+  if [ ${#EXTRA_DIRS[@]} -gt 1 ]; then
+    extra_note=" + $((${#EXTRA_DIRS[@]} - 1)) extra dir(s)"
+  fi
+  echo "ralph: generated sandbox settings at $SRT_SETTINGS (repo + claude config + docs dir$extra_note writable; *.anthropic.com network)" >&2
 fi
 
 # An `if` block, not `[ … ] && rm`: the && form returns 1 when the condition

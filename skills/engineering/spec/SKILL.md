@@ -1,11 +1,11 @@
 ---
 name: spec
-description: Turn the current conversation context into a PRD written to docs/{feature}/{feature}.prd.md. Use when user wants to create a spec or PRD from the current context.
+description: Turn the current conversation context into a PRD written to {feature}.prd.md in the feature's docs directory. Use when user wants to create a spec or PRD from the current context.
 ---
 
 # Spec
 
-Synthesise the current conversation context and codebase understanding into a PRD written to `docs/{feature}/{feature}.prd.md`. Do NOT interview the user — synthesise what you already know.
+Synthesise the current conversation context and codebase understanding into a PRD written to `{feature}.prd.md` in the feature's docs directory (see step 5 for how that directory is resolved). Do NOT interview the user — synthesise what you already know.
 
 ## Process
 
@@ -31,13 +31,18 @@ Check with the user that the modules match their expectations, and which they wa
 
 ### 5. Write the PRD
 
-Create `docs/{feature}/` if it doesn't exist. Write `docs/{feature}/{feature}.prd.md` using the template below.
+Resolve the docs directory for this feature:
+
+- **A docs directory for this piece of work has already been provided in the conversation** (e.g. a task-bound docs dir surfaced when the work was scoped or defined) → write the PRD there as `{feature}.prd.md`.
+- **Otherwise** → fall back to `docs/{feature}/` under the git root, creating it if it doesn't exist, and write `docs/{feature}/{feature}.prd.md`.
+
+Use the template below. Do not detect or guess at a location yourself — either one was provided in conversation, or you use the fallback.
 
 The file is ephemeral by default — the team may delete it once the feature ships, or keep it for review and reference. Do not reference it in code comments.
 
 ### 6. Stop
 
-Tell the user the PRD is at `docs/{feature}/{feature}.prd.md`. Then stop completely — do not suggest next steps, offer to slice, or offer to implement. The user will `/clear` and continue when they're ready.
+Tell the user the PRD's resolved **absolute path**. Then stop completely — do not suggest next steps, offer to slice, or offer to implement. The user will `/clear` and continue when they're ready.
 
 ## Template
 
