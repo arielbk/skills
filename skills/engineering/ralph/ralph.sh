@@ -25,6 +25,17 @@ fi
 FEATURE="$1"
 MAX_ITERATIONS="${2:-30}"
 
+# Optional model override. Bare `claude -p` inherits the host default (Opus);
+# set RALPH_MODEL to drive a well-defined DAG with a cheaper/faster model
+# (e.g. `claude-sonnet-4-6`). Built as an array so an unset knob expands to
+# nothing — no empty `--model ""` that claude would reject. The guarded
+# expansion below handles bash 3.2 (macOS default), where `${arr[@]}` on an
+# empty array under `set -u` is an unbound-variable error.
+MODEL_ARGS=()
+if [ -n "${RALPH_MODEL:-}" ]; then
+  MODEL_ARGS=(--model "$RALPH_MODEL")
+fi
+
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROMPT_TEMPLATE="$SKILL_DIR/resources/iteration-prompt.md"
 
@@ -206,9 +217,13 @@ PROMPT="$(render_prompt)"
 # Probe: validate the sandbox launches AND the host is authenticated, before
 # burning iteration 1 on a setup failure. A logged-out host (or a wrong
 # sandbox invocation) fails here with actionable instructions.
+if [ -n "${RALPH_MODEL:-}" ]; then
+  echo "ralph: iterations will run with --model $RALPH_MODEL" >&2
+fi
 echo "ralph: probing sandbox + auth…" >&2
 probe_out="$("${SRT_BIN[@]}" --settings "$SRT_SETTINGS" \
     claude -p --dangerously-skip-permissions \
+    ${MODEL_ARGS[@]+"${MODEL_ARGS[@]}"} \
     "Reply with the single word READY and nothing else." 2>&1 || true)"
 if ! printf '%s' "$probe_out" | grep -q "READY"; then
   echo "ralph: sandbox probe failed (did not return READY)." >&2
@@ -240,6 +255,7 @@ for ((i = 1; i <= MAX_ITERATIONS; i++)); do
   # (avoids two jq processes racing the same pipe).
   if ! "${SRT_BIN[@]}" --settings "$SRT_SETTINGS" \
         claude -p --dangerously-skip-permissions \
+        ${MODEL_ARGS[@]+"${MODEL_ARGS[@]}"} \
         --verbose --output-format stream-json \
         "$PROMPT" 2>"$stderr_file" \
       | tee "$raw_file" \

@@ -63,6 +63,7 @@ First assemble the directories the iterations need:
 
 - **Docs dir** — when the resolved docs dir is not the in-repo default (`docs/{feature}/`), pass it as `RALPH_DOCS_DIR`. The scripts derive the tasks/log paths from it **and grant it to the sandbox automatically** — never repeat it elsewhere.
 - **Extra writable roots** — only for genuinely additional directories (reference projects the user named): pass them as a colon-separated list of absolute paths in `RALPH_EXTRA_DIRS`. The repo and the docs dir are always granted; don't list them. A writable root is also readable, so this covers read-only reference projects too. Omit the variable when there are none.
+- **Model** — by default each iteration inherits the host's default model (Opus). Set `RALPH_MODEL` to drive the DAG with a different model — e.g. `RALPH_MODEL=claude-sonnet-4-6` to run a well-defined task DAG on Sonnet without burning Opus quota. The same knob works for the Codex runtime; pass a Codex model name there (e.g. `gpt-5-codex`). Each script passes it through verbatim as `--model`, so a bad name fails loudly at the runtime. Omit the variable to keep the host default.
 
 Then invoke the runtime's bundled script via Bash (run from the repo root — the scripts take the repo from `pwd`):
 
@@ -72,6 +73,10 @@ bash {skill-dir}/ralph.sh {feature} {max-iterations}
 
 # Claude — out-of-repo docs dir + a reference project
 RALPH_DOCS_DIR=/abs/docs-dir RALPH_EXTRA_DIRS=/abs/reference \
+  bash {skill-dir}/ralph.sh {feature} {max-iterations}
+
+# Claude — drive the DAG on Sonnet instead of the host default (Opus)
+RALPH_MODEL=claude-sonnet-4-6 \
   bash {skill-dir}/ralph.sh {feature} {max-iterations}
 
 # Codex — same variables, same meaning

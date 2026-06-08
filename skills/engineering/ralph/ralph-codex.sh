@@ -20,6 +20,15 @@ fi
 FEATURE="$1"
 MAX_ITERATIONS="${2:-30}"
 
+# Optional model override (same knob as ralph.sh). Each runtime interprets the
+# value itself — here it's passed to `codex exec --model`, so use a Codex model
+# name (e.g. `gpt-5-codex`). Built as an array so an unset knob expands to
+# nothing; the guarded expansion below handles bash 3.2's empty-array-under-set-u.
+MODEL_ARGS=()
+if [ -n "${RALPH_MODEL:-}" ]; then
+  MODEL_ARGS=(--model "$RALPH_MODEL")
+fi
+
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROMPT_TEMPLATE="$SKILL_DIR/resources/iteration-prompt.md"
 
@@ -111,6 +120,10 @@ for d in ${EXTRA_DIRS[@]+"${EXTRA_DIRS[@]}"}; do
 done
 WRITABLE_ROOTS="$WRITABLE_ROOTS]"
 
+if [ -n "${RALPH_MODEL:-}" ]; then
+  echo "ralph-codex: iterations will run with --model $RALPH_MODEL" >&2
+fi
+
 for ((i = 1; i <= MAX_ITERATIONS; i++)); do
   echo "─── ralph-codex iteration $i / $MAX_ITERATIONS ───"
 
@@ -134,6 +147,7 @@ for ((i = 1; i <= MAX_ITERATIONS; i++)); do
   # iteration STUCKs on commit.
   # </dev/null prevents codex's stdin-readback from blocking.
   if ! codex exec --json --skip-git-repo-check -s workspace-write \
+        ${MODEL_ARGS[@]+"${MODEL_ARGS[@]}"} \
         -c "sandbox_workspace_write.writable_roots=$WRITABLE_ROOTS" \
         "$PROMPT" </dev/null 2>&1 \
       | tee "$raw_file" \
