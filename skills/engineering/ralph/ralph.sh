@@ -36,6 +36,18 @@ if [ -n "${RALPH_MODEL:-}" ]; then
   MODEL_ARGS=(--model "$RALPH_MODEL")
 fi
 
+# Attribute every `claude -p` child this loop spawns to the Claude session that
+# launched it. Claude Code exposes the live session UUID to Bash tool calls (and
+# therefore to this script) as CLAUDE_CODE_SESSION_ID; we forward it as
+# TRACE_PARENT_SESSION, which the child's Trace SessionStart hook resolves to the
+# parent DB session and records as parentSessionId + origin='spawned'. Run from a
+# bare terminal (no parent Claude session) the var is unset — leave
+# TRACE_PARENT_SESSION unexported so children register as unlinked roots.
+if [ -n "${CLAUDE_CODE_SESSION_ID:-}" ]; then
+  export TRACE_PARENT_SESSION="$CLAUDE_CODE_SESSION_ID"
+  echo "ralph: attributing spawned children to parent session $TRACE_PARENT_SESSION" >&2
+fi
+
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROMPT_TEMPLATE="$SKILL_DIR/resources/iteration-prompt.md"
 
@@ -121,6 +133,9 @@ if [ -n "${RALPH_SRT_SETTINGS:-}" ]; then
   if [ -n "${RALPH_DOCS_DIR:-}" ] || [ -n "${RALPH_EXTRA_DIRS:-}" ]; then
     echo "ralph: warning — RALPH_SRT_SETTINGS replaces the whole settings file; the docs dir and RALPH_EXTRA_DIRS are NOT auto-granted. Your settings file's allowWrite must include them." >&2
   fi
+  if [ -n "${TRACE_PARENT_SESSION:-}" ]; then
+    echo "ralph: warning — RALPH_SRT_SETTINGS replaces the whole settings file; the Trace DB dir (default ~/.trace) is NOT auto-granted, so spawned-child attribution will fail unless your settings file's allowWrite includes it." >&2
+  fi
 else
   SRT_SETTINGS="$(mktemp -t ralph-srt-settings.XXXXXX.json)"
   CLEANUP_SETTINGS=1
@@ -142,6 +157,20 @@ else
     EXTRA_WRITE_JSON="$EXTRA_WRITE_JSON,
       \"$d\""
   done
+  # When this loop attributes spawned children (TRACE_PARENT_SESSION set), the
+  # child's Trace SessionStart hook registers itself into the shared Trace DB.
+  # The deny-all sandbox would block that write — and the attribution would
+  # silently never land — unless the DB's directory is writable. Honor a
+  # TRACE_DB override (grant its parent dir), else the default ~/.trace.
+  if [ -n "${TRACE_PARENT_SESSION:-}" ]; then
+    if [ -n "${TRACE_DB:-}" ]; then
+      TRACE_DB_DIR="$(dirname "$TRACE_DB")"
+    else
+      TRACE_DB_DIR="$HOME/.trace"
+    fi
+    EXTRA_WRITE_JSON="$EXTRA_WRITE_JSON,
+      \"$TRACE_DB_DIR\""
+  fi
   cat > "$SRT_SETTINGS" <<JSON
 {
   "filesystem": {
