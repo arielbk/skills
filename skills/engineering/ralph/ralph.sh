@@ -36,17 +36,42 @@ if [ -n "${RALPH_MODEL:-}" ]; then
   MODEL_ARGS=(--model "$RALPH_MODEL")
 fi
 
-# Attribute every `claude -p` child this loop spawns to the Claude session that
-# launched it. Claude Code exposes the live session UUID to Bash tool calls (and
-# therefore to this script) as CLAUDE_CODE_SESSION_ID; we forward it as
-# TRACE_PARENT_SESSION, which the child's Trace SessionStart hook resolves to the
-# parent DB session and records as parentSessionId + origin='spawned'. Run from a
-# bare terminal (no parent Claude session) the var is unset — leave
-# TRACE_PARENT_SESSION unexported so children register as unlinked roots.
-if [ -n "${CLAUDE_CODE_SESSION_ID:-}" ]; then
-  export TRACE_PARENT_SESSION="$CLAUDE_CODE_SESSION_ID"
-  echo "ralph: attributing spawned children to parent session $TRACE_PARENT_SESSION" >&2
+# Spawned-child attribution. Each `claude -p` child this loop spawns is a fresh
+# Trace session; we attribute it to the orchestrator session that launched
+# ralph. Claude Code exposes that live session UUID to Bash tool calls (and so
+# to this script) as CLAUDE_CODE_SESSION_ID. The loop stays Trace-blind: per
+# child it captures the child's own session id from the stream and hands the
+# (parent, child) pair to TRACE_SPAWN_HOOK — a command template with {parent}
+# and {child} placeholders, e.g.
+#   trace session set-parent {child} --parent {parent} --origin spawned
+# Unset hook → no-op; bare terminal (no parent session) → attribution skipped.
+# Every captured pair is also appended to a sink file as a robust
+# `<parent>\t<child>` source of truth, independent of whether the hook fires.
+PARENT_SESSION="${CLAUDE_CODE_SESSION_ID:-}"
+SPAWN_SINK=""
+if [ -n "$PARENT_SESSION" ]; then
+  SPAWN_SINK="$(mktemp -t ralph-spawn-sink.XXXXXX)"
+  echo "ralph: attributing spawned children to parent session $PARENT_SESSION" >&2
+  echo "ralph: spawn sink → $SPAWN_SINK" >&2
 fi
+
+# Record one spawned child and fire the per-child hook. No-ops without a parent
+# session, without a child id, or when child == parent (defensive — a fresh
+# `claude -p` always gets a new id, but never self-parent).
+emit_spawn() {
+  local child="$1"
+  [ -n "$child" ] || return 0
+  [ -n "$PARENT_SESSION" ] || return 0
+  [ "$child" != "$PARENT_SESSION" ] || return 0
+  printf '%s\t%s\n' "$PARENT_SESSION" "$child" >> "$SPAWN_SINK"
+  [ -n "${TRACE_SPAWN_HOOK:-}" ] || return 0
+  local cmd="${TRACE_SPAWN_HOOK//\{child\}/$child}"
+  cmd="${cmd//\{parent\}/$PARENT_SESSION}"
+  echo "ralph: spawn hook → $cmd" >&2
+  if ! eval "$cmd"; then
+    echo "ralph: warning — spawn hook exited non-zero for child $child" >&2
+  fi
+}
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROMPT_TEMPLATE="$SKILL_DIR/resources/iteration-prompt.md"
@@ -133,9 +158,6 @@ if [ -n "${RALPH_SRT_SETTINGS:-}" ]; then
   if [ -n "${RALPH_DOCS_DIR:-}" ] || [ -n "${RALPH_EXTRA_DIRS:-}" ]; then
     echo "ralph: warning — RALPH_SRT_SETTINGS replaces the whole settings file; the docs dir and RALPH_EXTRA_DIRS are NOT auto-granted. Your settings file's allowWrite must include them." >&2
   fi
-  if [ -n "${TRACE_PARENT_SESSION:-}" ]; then
-    echo "ralph: warning — RALPH_SRT_SETTINGS replaces the whole settings file; the Trace DB dir (default ~/.trace) is NOT auto-granted, so spawned-child attribution will fail unless your settings file's allowWrite includes it." >&2
-  fi
 else
   SRT_SETTINGS="$(mktemp -t ralph-srt-settings.XXXXXX.json)"
   CLEANUP_SETTINGS=1
@@ -157,20 +179,6 @@ else
     EXTRA_WRITE_JSON="$EXTRA_WRITE_JSON,
       \"$d\""
   done
-  # When this loop attributes spawned children (TRACE_PARENT_SESSION set), the
-  # child's Trace SessionStart hook registers itself into the shared Trace DB.
-  # The deny-all sandbox would block that write — and the attribution would
-  # silently never land — unless the DB's directory is writable. Honor a
-  # TRACE_DB override (grant its parent dir), else the default ~/.trace.
-  if [ -n "${TRACE_PARENT_SESSION:-}" ]; then
-    if [ -n "${TRACE_DB:-}" ]; then
-      TRACE_DB_DIR="$(dirname "$TRACE_DB")"
-    else
-      TRACE_DB_DIR="$HOME/.trace"
-    fi
-    EXTRA_WRITE_JSON="$EXTRA_WRITE_JSON,
-      \"$TRACE_DB_DIR\""
-  fi
   cat > "$SRT_SETTINGS" <<JSON
 {
   "filesystem": {
@@ -296,6 +304,13 @@ for ((i = 1; i <= MAX_ITERATIONS; i++)); do
   jq -rR "$FINAL_RESULT" "$raw_file" > "$result_file"
 
   result="$(cat "$result_file")"
+
+  # Attribute this child to the parent session. Its own session id is present on
+  # every stream event from the first line — with hooks installed the first
+  # lines are hook_started events, which also carry session_id — so take the
+  # first one seen. Captured before raw_file is removed in the summary block.
+  child_session="$(jq -rR 'fromjson? | .session_id // empty' "$raw_file" 2>/dev/null | head -n1 || true)"
+  emit_spawn "$child_session"
 
   echo
   echo "─── iteration $i summary ───"
