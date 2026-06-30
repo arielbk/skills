@@ -53,6 +53,14 @@ if [ -n "$PARENT_SESSION" ]; then
   SPAWN_SINK="$(mktemp -t ralph-spawn-sink.XXXXXX)"
   echo "ralph: attributing spawned children to parent session $PARENT_SESSION" >&2
   echo "ralph: spawn sink → $SPAWN_SINK" >&2
+  # Default the attribution hook to Trace's set-parent so a normal /ralph run
+  # nests children under the orchestrator session out of the box. The `+set`
+  # test respects an explicit override — including TRACE_SPAWN_HOOK='' to
+  # disable attribution entirely while keeping the sink as the source of truth.
+  if [ -z "${TRACE_SPAWN_HOOK+set}" ]; then
+    TRACE_SPAWN_HOOK='trace session set-parent {child} --parent {parent} --origin spawned'
+    echo "ralph: spawn hook defaulted → trace session set-parent" >&2
+  fi
 fi
 
 # Record one spawned child and fire the per-child hook. No-ops without a parent
@@ -155,15 +163,23 @@ if [ -n "${RALPH_SRT_SETTINGS:-}" ]; then
   SRT_SETTINGS="$RALPH_SRT_SETTINGS"
   CLEANUP_SETTINGS=0
   echo "ralph: using sandbox settings from \$RALPH_SRT_SETTINGS ($SRT_SETTINGS)" >&2
-  if [ -n "${RALPH_DOCS_DIR:-}" ] || [ -n "${RALPH_EXTRA_DIRS:-}" ]; then
-    echo "ralph: warning — RALPH_SRT_SETTINGS replaces the whole settings file; the docs dir and RALPH_EXTRA_DIRS are NOT auto-granted. Your settings file's allowWrite must include them." >&2
-  fi
+  echo "ralph: warning — RALPH_SRT_SETTINGS replaces the whole settings file; the Trace DB dir (\$TRACE_DB's dir, else ~/.trace), the docs dir, and RALPH_EXTRA_DIRS are NOT auto-granted. Your settings file's allowWrite must include them, or spawned children won't register in Trace." >&2
 else
   SRT_SETTINGS="$(mktemp -t ralph-srt-settings.XXXXXX.json)"
   CLEANUP_SETTINGS=1
   # Honor a host-set CLAUDE_CONFIG_DIR (e.g. ~/.claude-infinum); the inner claude
   # writes session state (session-env/<uuid>, etc.) there, not under ~/.claude.
   CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+  # The per-iteration child self-registers into the Trace DB from its own
+  # SessionStart hook; under the sandbox that write is denied unless the DB's
+  # dir is granted. Grant it UNCONDITIONALLY — registration is baseline and
+  # independent of attribution (which the optional spawn hook layers on top).
+  # Honor a host-set TRACE_DB (its dir), else Trace's default ~/.trace.
+  if [ -n "${TRACE_DB:-}" ]; then
+    TRACE_DB_DIR="$(dirname "$TRACE_DB")"
+  else
+    TRACE_DB_DIR="$HOME/.trace"
+  fi
   # sandbox-runtime v0.0.52 validates a nested filesystem/network schema and
   # requires every key present; the obsolete flat shape is rejected, which
   # collapses to deny-all and kills the probe. The temp-dir entries cover temp
@@ -190,6 +206,7 @@ else
       "$CLAUDE_DIR.json",
       "$HOME/.claude",
       "$HOME/.claude.json",
+      "$TRACE_DB_DIR",
       "/tmp",
       "/private/tmp",
       "/var/folders",
@@ -212,7 +229,7 @@ JSON
   if [ ${#EXTRA_DIRS[@]} -gt 1 ]; then
     extra_note=" + $((${#EXTRA_DIRS[@]} - 1)) extra dir(s)"
   fi
-  echo "ralph: generated sandbox settings at $SRT_SETTINGS (repo + claude config + docs dir$extra_note writable; *.anthropic.com network)" >&2
+  echo "ralph: generated sandbox settings at $SRT_SETTINGS (repo + claude config + Trace DB dir + docs dir$extra_note writable; *.anthropic.com network)" >&2
 fi
 
 # An `if` block, not `[ … ] && rm`: the && form returns 1 when the condition
@@ -258,10 +275,19 @@ if [ -n "${RALPH_MODEL:-}" ]; then
   echo "ralph: iterations will run with --model $RALPH_MODEL" >&2
 fi
 echo "ralph: probing sandbox + auth…" >&2
-probe_out="$("${SRT_BIN[@]}" --settings "$SRT_SETTINGS" \
+# The probe spawns a throwaway `claude -p` that, like any iteration, fires the
+# Trace SessionStart hook and would otherwise self-register as a stray,
+# unattributed session in the real store — one junk row per ralph run. Point
+# the probe's TRACE_DB at a discarded temp DB (temp dirs are already sandbox-
+# granted) so it still validates sandbox+auth but leaves no trace. Scoped to
+# this one command via the env-assignment prefix; iterations keep the host's
+# TRACE_DB (the real store, granted unconditionally above).
+PROBE_DB_DIR="$(mktemp -d -t ralph-probe-db.XXXXXX)"
+probe_out="$(TRACE_DB="$PROBE_DB_DIR/trace.sqlite" "${SRT_BIN[@]}" --settings "$SRT_SETTINGS" \
     claude -p --dangerously-skip-permissions \
     ${MODEL_ARGS[@]+"${MODEL_ARGS[@]}"} \
     "Reply with the single word READY and nothing else." 2>&1 || true)"
+rm -rf "$PROBE_DB_DIR"
 if ! printf '%s' "$probe_out" | grep -q "READY"; then
   echo "ralph: sandbox probe failed (did not return READY)." >&2
   echo "       Most likely the host Claude Code is not logged in, or network is blocked." >&2

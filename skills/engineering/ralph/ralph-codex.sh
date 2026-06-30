@@ -45,6 +45,14 @@ if [ -n "$PARENT_SESSION" ]; then
   SPAWN_SINK="$(mktemp -t ralph-spawn-sink.XXXXXX)"
   echo "ralph-codex: attributing spawned children to parent session $PARENT_SESSION" >&2
   echo "ralph-codex: spawn sink → $SPAWN_SINK" >&2
+  # Codex children can't self-register (no in-sandbox Trace hook), so the
+  # host-side spawn hook is the ONLY registration path. Default it to Trace's
+  # set-parent — an enrich-not-clobber upsert that seeds the codex child row.
+  # `+set` respects an explicit override, including '' to disable.
+  if [ -z "${TRACE_SPAWN_HOOK+set}" ]; then
+    TRACE_SPAWN_HOOK='trace session set-parent {child} --parent {parent} --origin spawned'
+    echo "ralph-codex: spawn hook defaulted → trace session set-parent" >&2
+  fi
 fi
 
 # Record one spawned child and fire the per-child hook. No-ops without a parent
