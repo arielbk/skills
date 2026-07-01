@@ -33,10 +33,13 @@ fi
 # `codex exec` child this loop spawns is attributed to the orchestrator session
 # that launched ralph (CLAUDE_CODE_SESSION_ID). The loop stays Trace-blind: per
 # child it captures the child's Codex thread id from the stream and hands the
-# (parent, child) pair to TRACE_SPAWN_HOOK — a command template with {parent}
-# and {child} placeholders, e.g.
-#   trace session set-parent {child} --parent {parent} --origin spawned
-# Unset hook → no-op; bare terminal (no parent session) → attribution skipped.
+# (parent, child) pair to TRACE_SPAWN_HOOK — a command template with {parent},
+# {child}, and {transcript} placeholders, e.g.
+#   trace session set-parent {child} --parent {parent} --origin spawned \
+#     --tool codex --transcript {transcript}
+# {transcript} is resolved loop-side (Trace-blind find over Codex's own rollout
+# files) so the child registers with its real tool + transcript, not a codex:<id>
+# placeholder. Unset hook → no-op; bare terminal (no parent) → attribution skipped.
 # Every captured pair is also appended to a sink file as a robust
 # `<parent>\t<child>` source of truth.
 PARENT_SESSION="${CLAUDE_CODE_SESSION_ID:-}"
@@ -50,7 +53,7 @@ if [ -n "$PARENT_SESSION" ]; then
   # set-parent — an enrich-not-clobber upsert that seeds the codex child row.
   # `+set` respects an explicit override, including '' to disable.
   if [ -z "${TRACE_SPAWN_HOOK+set}" ]; then
-    TRACE_SPAWN_HOOK='trace session set-parent {child} --parent {parent} --origin spawned'
+    TRACE_SPAWN_HOOK='trace session set-parent {child} --parent {parent} --origin spawned --tool codex --transcript {transcript}'
     echo "ralph-codex: spawn hook defaulted → trace session set-parent" >&2
   fi
 fi
@@ -66,6 +69,22 @@ emit_spawn() {
   [ -n "${TRACE_SPAWN_HOOK:-}" ] || return 0
   local cmd="${TRACE_SPAWN_HOOK//\{child\}/$child}"
   cmd="${cmd//\{parent\}/$PARENT_SESSION}"
+  # Resolve the child's real rollout transcript loop-side so set-parent registers
+  # it with its true tool + path instead of a codex:<id> placeholder. Trace-blind:
+  # a `find` over Codex's OWN sessions dir by child id — rollout files are named
+  # rollout-<ts>-<uuid>.jsonl (the child id is the uuid suffix), so match
+  # *<child>.jsonl. If it can't be resolved, strip the tool/transcript flags so the
+  # hook falls back to the legacy placeholder row rather than an empty --transcript.
+  if [[ "$cmd" == *"{transcript}"* ]]; then
+    local transcript
+    transcript="$(find "${CODEX_HOME:-$HOME/.codex}/sessions" -type f -name "*$child.jsonl" 2>/dev/null | head -n1 || true)"
+    if [ -n "$transcript" ]; then
+      cmd="${cmd//\{transcript\}/$transcript}"
+    else
+      cmd="$(printf '%s' "$cmd" | sed -E 's/ --tool [^ ]+ --transcript \{transcript\}//')"
+      echo "ralph-codex: warning — could not resolve transcript for child $child; registering without tool/transcript" >&2
+    fi
+  fi
   echo "ralph-codex: spawn hook → $cmd" >&2
   if ! eval "$cmd"; then
     echo "ralph-codex: warning — spawn hook exited non-zero for child $child" >&2

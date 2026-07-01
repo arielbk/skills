@@ -41,10 +41,13 @@ fi
 # ralph. Claude Code exposes that live session UUID to Bash tool calls (and so
 # to this script) as CLAUDE_CODE_SESSION_ID. The loop stays Trace-blind: per
 # child it captures the child's own session id from the stream and hands the
-# (parent, child) pair to TRACE_SPAWN_HOOK — a command template with {parent}
-# and {child} placeholders, e.g.
-#   trace session set-parent {child} --parent {parent} --origin spawned
-# Unset hook → no-op; bare terminal (no parent session) → attribution skipped.
+# (parent, child) pair to TRACE_SPAWN_HOOK — a command template with {parent},
+# {child}, and {transcript} placeholders, e.g.
+#   trace session set-parent {child} --parent {parent} --origin spawned \
+#     --tool claude --transcript {transcript}
+# {transcript} is resolved loop-side (Trace-blind find over Claude's own session
+# files) so the child registers with its real tool + transcript, not a codex
+# placeholder. Unset hook → no-op; bare terminal (no parent) → attribution skipped.
 # Every captured pair is also appended to a sink file as a robust
 # `<parent>\t<child>` source of truth, independent of whether the hook fires.
 PARENT_SESSION="${CLAUDE_CODE_SESSION_ID:-}"
@@ -58,7 +61,7 @@ if [ -n "$PARENT_SESSION" ]; then
   # test respects an explicit override — including TRACE_SPAWN_HOOK='' to
   # disable attribution entirely while keeping the sink as the source of truth.
   if [ -z "${TRACE_SPAWN_HOOK+set}" ]; then
-    TRACE_SPAWN_HOOK='trace session set-parent {child} --parent {parent} --origin spawned'
+    TRACE_SPAWN_HOOK='trace session set-parent {child} --parent {parent} --origin spawned --tool claude --transcript {transcript}'
     echo "ralph: spawn hook defaulted → trace session set-parent" >&2
   fi
 fi
@@ -75,6 +78,23 @@ emit_spawn() {
   [ -n "${TRACE_SPAWN_HOOK:-}" ] || return 0
   local cmd="${TRACE_SPAWN_HOOK//\{child\}/$child}"
   cmd="${cmd//\{parent\}/$PARENT_SESSION}"
+  # Resolve the child's real transcript loop-side so set-parent registers it with
+  # its true tool + path instead of a codex:<id> placeholder. Trace-blind: a
+  # `find` over Claude's OWN project session files by child id, never a read of
+  # the Trace DB. The child ran to completion before this fires, so <id>.jsonl
+  # already exists. If it can't be resolved, strip the tool/transcript flags so
+  # the hook falls back to the legacy placeholder row rather than passing an
+  # empty --transcript arg.
+  if [[ "$cmd" == *"{transcript}"* ]]; then
+    local transcript
+    transcript="$(find "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects" -type f -name "$child.jsonl" 2>/dev/null | head -n1 || true)"
+    if [ -n "$transcript" ]; then
+      cmd="${cmd//\{transcript\}/$transcript}"
+    else
+      cmd="$(printf '%s' "$cmd" | sed -E 's/ --tool [^ ]+ --transcript \{transcript\}//')"
+      echo "ralph: warning — could not resolve transcript for child $child; registering without tool/transcript" >&2
+    fi
+  fi
   echo "ralph: spawn hook → $cmd" >&2
   if ! eval "$cmd"; then
     echo "ralph: warning — spawn hook exited non-zero for child $child" >&2
@@ -163,23 +183,15 @@ if [ -n "${RALPH_SRT_SETTINGS:-}" ]; then
   SRT_SETTINGS="$RALPH_SRT_SETTINGS"
   CLEANUP_SETTINGS=0
   echo "ralph: using sandbox settings from \$RALPH_SRT_SETTINGS ($SRT_SETTINGS)" >&2
-  echo "ralph: warning — RALPH_SRT_SETTINGS replaces the whole settings file; the Trace DB dir (\$TRACE_DB's dir, else ~/.trace), the docs dir, and RALPH_EXTRA_DIRS are NOT auto-granted. Your settings file's allowWrite must include them, or spawned children won't register in Trace." >&2
+  if [ -n "${RALPH_DOCS_DIR:-}" ] || [ -n "${RALPH_EXTRA_DIRS:-}" ]; then
+    echo "ralph: warning — RALPH_SRT_SETTINGS replaces the whole settings file; the docs dir and RALPH_EXTRA_DIRS are NOT auto-granted. Your settings file's allowWrite must include them." >&2
+  fi
 else
   SRT_SETTINGS="$(mktemp -t ralph-srt-settings.XXXXXX.json)"
   CLEANUP_SETTINGS=1
   # Honor a host-set CLAUDE_CONFIG_DIR (e.g. ~/.claude-infinum); the inner claude
   # writes session state (session-env/<uuid>, etc.) there, not under ~/.claude.
   CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
-  # The per-iteration child self-registers into the Trace DB from its own
-  # SessionStart hook; under the sandbox that write is denied unless the DB's
-  # dir is granted. Grant it UNCONDITIONALLY — registration is baseline and
-  # independent of attribution (which the optional spawn hook layers on top).
-  # Honor a host-set TRACE_DB (its dir), else Trace's default ~/.trace.
-  if [ -n "${TRACE_DB:-}" ]; then
-    TRACE_DB_DIR="$(dirname "$TRACE_DB")"
-  else
-    TRACE_DB_DIR="$HOME/.trace"
-  fi
   # sandbox-runtime v0.0.52 validates a nested filesystem/network schema and
   # requires every key present; the obsolete flat shape is rejected, which
   # collapses to deny-all and kills the probe. The temp-dir entries cover temp
@@ -206,7 +218,6 @@ else
       "$CLAUDE_DIR.json",
       "$HOME/.claude",
       "$HOME/.claude.json",
-      "$TRACE_DB_DIR",
       "/tmp",
       "/private/tmp",
       "/var/folders",
@@ -229,7 +240,7 @@ JSON
   if [ ${#EXTRA_DIRS[@]} -gt 1 ]; then
     extra_note=" + $((${#EXTRA_DIRS[@]} - 1)) extra dir(s)"
   fi
-  echo "ralph: generated sandbox settings at $SRT_SETTINGS (repo + claude config + Trace DB dir + docs dir$extra_note writable; *.anthropic.com network)" >&2
+  echo "ralph: generated sandbox settings at $SRT_SETTINGS (repo + claude config + docs dir$extra_note writable; *.anthropic.com network)" >&2
 fi
 
 # An `if` block, not `[ … ] && rm`: the && form returns 1 when the condition
@@ -275,19 +286,10 @@ if [ -n "${RALPH_MODEL:-}" ]; then
   echo "ralph: iterations will run with --model $RALPH_MODEL" >&2
 fi
 echo "ralph: probing sandbox + auth…" >&2
-# The probe spawns a throwaway `claude -p` that, like any iteration, fires the
-# Trace SessionStart hook and would otherwise self-register as a stray,
-# unattributed session in the real store — one junk row per ralph run. Point
-# the probe's TRACE_DB at a discarded temp DB (temp dirs are already sandbox-
-# granted) so it still validates sandbox+auth but leaves no trace. Scoped to
-# this one command via the env-assignment prefix; iterations keep the host's
-# TRACE_DB (the real store, granted unconditionally above).
-PROBE_DB_DIR="$(mktemp -d -t ralph-probe-db.XXXXXX)"
-probe_out="$(TRACE_DB="$PROBE_DB_DIR/trace.sqlite" "${SRT_BIN[@]}" --settings "$SRT_SETTINGS" \
+probe_out="$("${SRT_BIN[@]}" --settings "$SRT_SETTINGS" \
     claude -p --dangerously-skip-permissions \
     ${MODEL_ARGS[@]+"${MODEL_ARGS[@]}"} \
     "Reply with the single word READY and nothing else." 2>&1 || true)"
-rm -rf "$PROBE_DB_DIR"
 if ! printf '%s' "$probe_out" | grep -q "READY"; then
   echo "ralph: sandbox probe failed (did not return READY)." >&2
   echo "       Most likely the host Claude Code is not logged in, or network is blocked." >&2
