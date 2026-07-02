@@ -36,6 +36,71 @@ if [ -n "${RALPH_MODEL:-}" ]; then
   MODEL_ARGS=(--model "$RALPH_MODEL")
 fi
 
+# Spawned-child attribution. Each `claude -p` child this loop spawns is a fresh
+# Trace session; we attribute it to the orchestrator session that launched
+# ralph. Claude Code exposes that live session UUID to Bash tool calls (and so
+# to this script) as CLAUDE_CODE_SESSION_ID. The loop stays Trace-blind: per
+# child it captures the child's own session id from the stream and hands the
+# (parent, child) pair to TRACE_SPAWN_HOOK — a command template with {parent},
+# {child}, and {transcript} placeholders, e.g.
+#   trace session set-parent {child} --parent {parent} --origin spawned \
+#     --tool claude --transcript {transcript}
+# {transcript} is resolved loop-side (Trace-blind find over Claude's own session
+# files) so the child registers with its real tool + transcript, not a codex
+# placeholder. Unset hook → no-op; bare terminal (no parent) → attribution skipped.
+# Every captured pair is also appended to a sink file as a robust
+# `<parent>\t<child>` source of truth, independent of whether the hook fires.
+PARENT_SESSION="${CLAUDE_CODE_SESSION_ID:-}"
+SPAWN_SINK=""
+if [ -n "$PARENT_SESSION" ]; then
+  SPAWN_SINK="$(mktemp -t ralph-spawn-sink.XXXXXX)"
+  echo "ralph: attributing spawned children to parent session $PARENT_SESSION" >&2
+  echo "ralph: spawn sink → $SPAWN_SINK" >&2
+  # Default the attribution hook to Trace's set-parent so a normal /ralph run
+  # nests children under the orchestrator session out of the box. The `+set`
+  # test respects an explicit override — including TRACE_SPAWN_HOOK='' to
+  # disable attribution entirely while keeping the sink as the source of truth.
+  if [ -z "${TRACE_SPAWN_HOOK+set}" ]; then
+    TRACE_SPAWN_HOOK='trace session set-parent {child} --parent {parent} --origin spawned --tool claude --transcript {transcript}'
+    echo "ralph: spawn hook defaulted → trace session set-parent" >&2
+  fi
+fi
+
+# Record one spawned child and fire the per-child hook. No-ops without a parent
+# session, without a child id, or when child == parent (defensive — a fresh
+# `claude -p` always gets a new id, but never self-parent).
+emit_spawn() {
+  local child="$1"
+  [ -n "$child" ] || return 0
+  [ -n "$PARENT_SESSION" ] || return 0
+  [ "$child" != "$PARENT_SESSION" ] || return 0
+  printf '%s\t%s\n' "$PARENT_SESSION" "$child" >> "$SPAWN_SINK"
+  [ -n "${TRACE_SPAWN_HOOK:-}" ] || return 0
+  local cmd="${TRACE_SPAWN_HOOK//\{child\}/$child}"
+  cmd="${cmd//\{parent\}/$PARENT_SESSION}"
+  # Resolve the child's real transcript loop-side so set-parent registers it with
+  # its true tool + path instead of a codex:<id> placeholder. Trace-blind: a
+  # `find` over Claude's OWN project session files by child id, never a read of
+  # the Trace DB. The child ran to completion before this fires, so <id>.jsonl
+  # already exists. If it can't be resolved, strip the tool/transcript flags so
+  # the hook falls back to the legacy placeholder row rather than passing an
+  # empty --transcript arg.
+  if [[ "$cmd" == *"{transcript}"* ]]; then
+    local transcript
+    transcript="$(find "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects" -type f -name "$child.jsonl" 2>/dev/null | head -n1 || true)"
+    if [ -n "$transcript" ]; then
+      cmd="${cmd//\{transcript\}/$transcript}"
+    else
+      cmd="$(printf '%s' "$cmd" | sed -E 's/ --tool [^ ]+ --transcript \{transcript\}//')"
+      echo "ralph: warning — could not resolve transcript for child $child; registering without tool/transcript" >&2
+    fi
+  fi
+  echo "ralph: spawn hook → $cmd" >&2
+  if ! eval "$cmd"; then
+    echo "ralph: warning — spawn hook exited non-zero for child $child" >&2
+  fi
+}
+
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROMPT_TEMPLATE="$SKILL_DIR/resources/iteration-prompt.md"
 
@@ -267,6 +332,13 @@ for ((i = 1; i <= MAX_ITERATIONS; i++)); do
   jq -rR "$FINAL_RESULT" "$raw_file" > "$result_file"
 
   result="$(cat "$result_file")"
+
+  # Attribute this child to the parent session. Its own session id is present on
+  # every stream event from the first line — with hooks installed the first
+  # lines are hook_started events, which also carry session_id — so take the
+  # first one seen. Captured before raw_file is removed in the summary block.
+  child_session="$(jq -rR 'fromjson? | .session_id // empty' "$raw_file" 2>/dev/null | head -n1 || true)"
+  emit_spawn "$child_session"
 
   echo
   echo "─── iteration $i summary ───"
