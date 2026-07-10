@@ -19,6 +19,8 @@ This skill's job is small: pick the runtime, validate inputs, invoke the bundled
 - [resources/iteration-prompt.md](resources/iteration-prompt.md) — the prompt template each iteration receives. Shared by both runtimes.
 - [resources/qa-prompt.md](resources/qa-prompt.md) — the prompt for the final QA-plan agent. Shared by both runtimes.
 
+Ralph also vendors `/implement`'s discipline files in `resources/` — [tdd-loop.md](resources/tdd-loop.md), [log-format.md](resources/log-format.md), [qa-template.md](resources/qa-template.md) — so a solo-ralph install is self-contained (kept in sync with the canonical copies in `../implement/resources/`). The scripts substitute the first two into the iteration prompt as absolute paths; this skill substitutes the third into the QA prompt (step 5). Spawned agents get real paths — they cannot resolve a skill resource by name (Codex has no skill system at all).
+
 ## Process
 
 ### 1. Pick the runtime
@@ -64,6 +66,7 @@ First assemble the directories the iterations need:
 - **Docs dir** — when the resolved docs dir is not the in-repo default (`docs/{feature}/`), pass it as `RALPH_DOCS_DIR`. The scripts derive the tasks/log paths from it **and grant it to the sandbox automatically** — never repeat it elsewhere.
 - **Extra writable roots** — only for genuinely additional directories (reference projects the user named): pass them as a colon-separated list of absolute paths in `RALPH_EXTRA_DIRS`. The repo and the docs dir are always granted; don't list them. A writable root is also readable, so this covers read-only reference projects too. Omit the variable when there are none.
 - **Model** — by default each iteration inherits the host's default model (Opus). Set `RALPH_MODEL` to drive the DAG with a different model — e.g. `RALPH_MODEL=claude-sonnet-4-6` to run a well-defined task DAG on Sonnet without burning Opus quota. The same knob works for the Codex runtime; pass a Codex model name there (e.g. `gpt-5-codex`). Each script passes it through verbatim as `--model`, so a bad name fails loudly at the runtime. Omit the variable to keep the host default.
+- **Reasoning effort (Codex only)** — set `RALPH_CODEX_REASONING` (e.g. `medium`, `high`) to pass `-c model_reasoning_effort=<value>` to each iteration, scoping the effort to the run instead of editing `~/.codex/config.toml`. Omit to inherit the user's Codex config.
 
 Then invoke the runtime's bundled script via Bash (run from the repo root — the scripts take the repo from `pwd`):
 
@@ -99,7 +102,7 @@ Do not babysit individual iterations. Just let the script run and capture its ex
 
 ### 5. Generate the QA plan (only on clean completion)
 
-**Only** if the loop exited `0` with `COMPLETE` in output: spawn one final agent (same runtime that ran the loop — `claude -p` for the Claude path, `codex exec` for the Codex path) using the prompt template in [resources/qa-prompt.md](resources/qa-prompt.md). Render its placeholders with the resolved absolute paths — `{{FEATURE}}`, `{{TASKS_FILE}}`, `{{LOG_FILE}}`, and `{{QA_FILE}}` (= `{docs dir}/{feature}.qa.md`). This agent reads the tasks file + log and writes the QA plan in the same shape `/implement` produces.
+**Only** if the loop exited `0` with `COMPLETE` in output: spawn one final agent (same runtime that ran the loop — `claude -p` for the Claude path, `codex exec` for the Codex path) using the prompt template in [resources/qa-prompt.md](resources/qa-prompt.md). Render its placeholders with the resolved absolute paths — `{{FEATURE}}`, `{{TASKS_FILE}}`, `{{LOG_FILE}}`, `{{QA_FILE}}` (= `{docs dir}/{feature}.qa.md`), and `{{QA_TEMPLATE}}` (= `{skill-dir}/resources/qa-template.md` — this skill's vendored copy of `/implement`'s QA template). This agent reads the tasks file + log and writes the QA plan in the same shape `/implement` produces.
 
 For any other exit (STUCK at exit `76`, iteration cap at exit `75`, or anything else), do **not** generate QA. Instead, surface the current state of `{feature}.tasks.md` (slug + `Status:` for each slice) so the user can intervene. If the exit was STUCK, also surface the STUCK reason from the final iteration's stdout verbatim.
 

@@ -1,4 +1,4 @@
-<!-- Canonical copy. Also vendored at skills/engineering/ralph/resources/tdd-loop.md so /ralph is self-contained — keep in sync. -->
+<!-- Vendored from skills/engineering/implement/resources/tdd-loop.md (canonical) so /ralph is self-contained. Keep in sync. -->
 # TDD Loop
 
 Apply this loop for each behavior within a slice.

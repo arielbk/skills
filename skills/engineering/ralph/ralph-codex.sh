@@ -29,6 +29,13 @@ if [ -n "${RALPH_MODEL:-}" ]; then
   MODEL_ARGS=(--model "$RALPH_MODEL")
 fi
 
+# Optional reasoning-effort override (Codex only). Passed as a config override
+# so it scopes to this run instead of editing ~/.codex/config.toml. Values are
+# whatever the Codex CLI accepts (e.g. low|medium|high|xhigh).
+if [ -n "${RALPH_CODEX_REASONING:-}" ]; then
+  MODEL_ARGS+=(-c "model_reasoning_effort=$RALPH_CODEX_REASONING")
+fi
+
 # Spawned-child attribution (mirrors ralph.sh; see its comment). Each
 # `codex exec` child this loop spawns is attributed to the orchestrator session
 # that launched ralph (CLAUDE_CODE_SESSION_ID). The loop stays Trace-blind: per
@@ -94,6 +101,12 @@ emit_spawn() {
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROMPT_TEMPLATE="$SKILL_DIR/resources/iteration-prompt.md"
 
+# Iteration discipline files, vendored from /implement's resources (see
+# ralph.sh for the rationale). Substituted into the prompt as absolute paths —
+# codex has no skill system, so a by-name reference is unresolvable for it.
+TDD_LOOP_FILE="$SKILL_DIR/resources/tdd-loop.md"
+LOG_FORMAT_FILE="$SKILL_DIR/resources/log-format.md"
+
 REPO_ROOT="$(pwd)"
 # The feature's docs dir defaults to the in-repo convention; the orchestrator
 # overrides it (RALPH_DOCS_DIR) when the feature's artifacts live elsewhere.
@@ -137,6 +150,12 @@ if [ ! -f "$PROMPT_TEMPLATE" ]; then
   exit 70
 fi
 
+if [ ! -f "$TDD_LOOP_FILE" ] || [ ! -f "$LOG_FORMAT_FILE" ]; then
+  echo "ralph-codex: discipline resources missing (expected $TDD_LOOP_FILE and $LOG_FORMAT_FILE)" >&2
+  echo "       This skill install looks incomplete; reinstall /ralph." >&2
+  exit 70
+fi
+
 if ! command -v codex >/dev/null 2>&1; then
   echo "ralph-codex: codex CLI not found on PATH" >&2
   exit 69
@@ -169,6 +188,8 @@ render_prompt() {
     -e "s|{{FEATURE}}|$FEATURE|g" \
     -e "s|{{TASKS_FILE}}|$TASKS_FILE|g" \
     -e "s|{{LOG_FILE}}|$LOG_FILE|g" \
+    -e "s|{{TDD_LOOP}}|$TDD_LOOP_FILE|g" \
+    -e "s|{{LOG_FORMAT}}|$LOG_FORMAT_FILE|g" \
     "$PROMPT_TEMPLATE"
 }
 
@@ -184,6 +205,9 @@ WRITABLE_ROOTS="$WRITABLE_ROOTS]"
 
 if [ -n "${RALPH_MODEL:-}" ]; then
   echo "ralph-codex: iterations will run with --model $RALPH_MODEL" >&2
+fi
+if [ -n "${RALPH_CODEX_REASONING:-}" ]; then
+  echo "ralph-codex: iterations will run with model_reasoning_effort=$RALPH_CODEX_REASONING" >&2
 fi
 
 for ((i = 1; i <= MAX_ITERATIONS; i++)); do

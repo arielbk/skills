@@ -1,4 +1,4 @@
-<!-- Canonical copy. Also vendored at skills/engineering/ralph/resources/qa-template.md so /ralph is self-contained — keep in sync. -->
+<!-- Vendored from skills/engineering/implement/resources/qa-template.md (canonical) so /ralph is self-contained. Keep in sync. -->
 # QA Plan Template
 
 Write `{feature}.qa.md` next to the feature's tasks file after all slices are complete. Read `{feature}.tasks.md` and `{feature}.log.md` before writing.

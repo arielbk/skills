@@ -104,6 +104,14 @@ emit_spawn() {
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROMPT_TEMPLATE="$SKILL_DIR/resources/iteration-prompt.md"
 
+# Iteration discipline files, vendored from /implement's resources so a
+# solo-ralph install is self-contained. Substituted into the prompt as
+# absolute paths because a fresh spawned agent has no way to resolve a skill
+# resource by name — codex exec has no skill system at all, and even
+# claude -p shouldn't have to guess.
+TDD_LOOP_FILE="$SKILL_DIR/resources/tdd-loop.md"
+LOG_FORMAT_FILE="$SKILL_DIR/resources/log-format.md"
+
 REPO_ROOT="$(pwd)"
 # The feature's docs dir defaults to the in-repo convention; the orchestrator
 # overrides it (RALPH_DOCS_DIR) when the feature's artifacts live elsewhere.
@@ -144,6 +152,12 @@ fi
 
 if [ ! -f "$PROMPT_TEMPLATE" ]; then
   echo "ralph: prompt template missing at $PROMPT_TEMPLATE" >&2
+  exit 70
+fi
+
+if [ ! -f "$TDD_LOOP_FILE" ] || [ ! -f "$LOG_FORMAT_FILE" ]; then
+  echo "ralph: discipline resources missing (expected $TDD_LOOP_FILE and $LOG_FORMAT_FILE)" >&2
+  echo "       This skill install looks incomplete; reinstall /ralph." >&2
   exit 70
 fi
 
@@ -274,6 +288,8 @@ render_prompt() {
     -e "s|{{FEATURE}}|$FEATURE|g" \
     -e "s|{{TASKS_FILE}}|$TASKS_FILE|g" \
     -e "s|{{LOG_FILE}}|$LOG_FILE|g" \
+    -e "s|{{TDD_LOOP}}|$TDD_LOOP_FILE|g" \
+    -e "s|{{LOG_FORMAT}}|$LOG_FORMAT_FILE|g" \
     "$PROMPT_TEMPLATE"
 }
 
