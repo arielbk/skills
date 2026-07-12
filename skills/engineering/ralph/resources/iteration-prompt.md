@@ -8,8 +8,8 @@ You have **no memory of prior iterations**. Everything you need is on disk.
 
 1. **Tasks file:** `{{TASKS_FILE}}` — the slice DAG. Each slice has a slug, `Status:`, `Depends on:`, an outside-in description, and a feedback loop.
 2. **Log file:** `{{LOG_FILE}}` — entries written by prior iterations. May not exist yet; if so, you are the first iteration and will create it.
-3. **`tdd-loop.md`** in the `/implement` skill's resources — red/green/refactor discipline.
-4. **`log-format.md`** in the `/implement` skill's resources — the exact format for your log entry.
+3. **TDD loop:** `{{TDD_LOOP}}` — red/green/refactor discipline.
+4. **Log format:** `{{LOG_FORMAT}}` — the exact format for your log entry.
 
 ## Completion check (do this first)
 
@@ -48,7 +48,7 @@ If — and only if — no slice is pickable because every unsettled slice is gen
 ## Implement the slice
 
 1. Edit the tasks file: ensure your slice's `Status:` is `in-progress` (flip it from `not-started`; if you reclaimed an orphan it is already there).
-2. Apply the red-green-refactor loop from `tdd-loop.md` against the slice's outside-in description and feedback loop. One behaviour, one test, one implementation, repeat.
+2. Apply the red-green-refactor loop from the TDD-loop file against the slice's outside-in description and feedback loop. One behaviour, one test, one implementation, repeat.
 3. Run the slice's feedback loop (tests + typechecks + lints as relevant). It must pass before you continue.
 4. Edit the tasks file: flip your slice's `Status:` to `done` — or to `needs-review` if the slice has `Human checkpoint: yes` or you self-flag uncertainty.
 
@@ -61,7 +61,7 @@ If — and only if — no slice is pickable because every unsettled slice is gen
    - For code paths that need a missing OS/runtime, at least syntax-check or type-check what you can so structural defects surface here, not on a reviewer's machine.
 
    Flip to `needs-review` only after these structural checks pass and a *runtime* gate genuinely needs human eyes (GUI behaviour, hardware, network, etc.). If a structural check fails, fix it before flipping.
-5. Append one entry to `{{LOG_FILE}}` using the `log-format.md` template. Create the file if it doesn't exist.
+5. Append one entry to `{{LOG_FILE}}` using the log-format template. Create the file if it doesn't exist.
 
 **Stay in your lane.** Touch only files relevant to this one slice plus the single row you own in the tasks file. Never edit another slice's row.
 
@@ -86,4 +86,4 @@ After committing, emit exactly one line as the last thing in your reply:
 <iteration-done>{slice-slug}</iteration-done>
 ```
 
-The outer loop only checks for `<promise>COMPLETE</promise>` — the `<iteration-done>` tag is for human-readable logs. Do not emit `<promise>COMPLETE</promise>` unless every slice in the tasks file is `done`.
+The outer loop only checks for `<promise>COMPLETE</promise>` — the `<iteration-done>` tag is for human-readable logs. Do not emit `<promise>COMPLETE</promise>` unless every slice in the tasks file is settled (`done` or `needs-review`).

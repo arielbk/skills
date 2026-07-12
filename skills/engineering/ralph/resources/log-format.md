@@ -1,4 +1,4 @@
-<!-- Canonical copy. Also vendored at skills/engineering/ralph/resources/log-format.md so /ralph is self-contained — keep in sync. -->
+<!-- Vendored from skills/engineering/implement/resources/log-format.md (canonical) so /ralph is self-contained. Keep in sync. -->
 # Log Entry Format
 
 Append one entry to the feature's `{feature}.log.md` (sibling of the tasks file) after completing each slice.
