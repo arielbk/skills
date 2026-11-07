@@ -1,0 +1,46 @@
+/* Ariel's Google Docs house theme.
+   Helvetica Neue, black body text, Infinum red #D82828 as the only accent.
+
+   Spacing note: the Drive HTML importer DROPS margin-top. Use padding-top for
+   space above a block — it maps to spaceAbove. margin-bottom does map to
+   spaceBelow. padding-left and margin-left both map to indentStart and are
+   summed. border-* and background-color are dropped entirely; the callout box
+   is drawn by publish.py's fixup pass instead. */
+
+body        { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 11pt; color: #000000; line-height: 1.45; }
+
+h1.doctitle { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 22pt; font-weight: bold; color: #000000; margin-bottom: 4pt; line-height: 1.2; }
+p.subtitle  { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14pt; color: #666666; margin-bottom: 26pt; line-height: 1.3; }
+
+h1          { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 20pt; font-weight: bold; color: #000000; padding-top: 30pt; margin-bottom: 10pt; line-height: 1.2; }
+h2          { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14pt; font-weight: bold; color: #D82828; padding-top: 22pt; margin-bottom: 8pt; line-height: 1.25; }
+h3          { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 13pt; font-weight: bold; color: #000000; padding-top: 16pt; margin-bottom: 6pt; line-height: 1.3; }
+
+p, li       { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 11pt; color: #000000; line-height: 1.45; }
+p           { margin-bottom: 11pt; }
+li          { margin-bottom: 6pt; }
+ul, ol      { margin-bottom: 11pt; }
+
+a           { color: #D82828; }
+.red        { color: #D82828; }
+.redb       { color: #D82828; font-weight: bold; }
+
+blockquote  { margin-left: 20pt; margin-right: 20pt; margin-bottom: 14pt; padding-top: 8pt; font-style: italic; color: #333333; line-height: 1.5; }
+
+/* Indented aside, no box. */
+p.note      { margin-left: 22pt; margin-bottom: 11pt; padding-top: 6pt; }
+
+/* Callout box: a single-cell table, because paragraph shading has no inner
+   padding and would leave the text hugging the tint. Cell background and
+   padding both survive the import; borders stay unset and render as none.
+   Full content width, so the box aligns with the body text rather than
+   sitting in an indent. publish.py adds the space around it. */
+table.callout        { background-color: #F4F9FF; border: none; border-collapse: collapse; width: 100%; }
+table.callout td     { background-color: #F4F9FF; padding: 16pt 18pt; border: none; }
+table.callout td p   { margin-bottom: 0; color: #333333; line-height: 1.45; }
+
+/* Inline code. font-family is stripped on import, so only the tint arrives —
+   publish.py finds runs carrying exactly this tint and applies Roboto Mono.
+   Keep in sync with CODE_TINT in publish.py. Author as <code>…</code>;
+   wrap() rewrites it, because the importer ignores CSS on <code> itself. */
+span.mono   { background-color: #F1F1F1; }
