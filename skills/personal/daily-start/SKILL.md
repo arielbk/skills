@@ -27,6 +27,18 @@ If `Dailies/{date}.md` already exists, read it and skip to step 5 (schedule). Ot
 
 ### 3. Gather context in parallel
 
+**First, check for a fresh briefing.** If `Dailies/.briefing-{date}.md` exists and
+its `date:` frontmatter matches today, `/daily-gather` already did this gathering
+(likely via the morning launchd job). Read it and **skip the MCP round-trips
+below** — the briefing body IS the step-4 triage prompt, pre-filled. Present it
+directly. Two caveats:
+- If the briefing has a `⚠️ Gather gaps` line, re-pull only those specific sources.
+- The briefing may be up to ~30 min stale. If it was gathered well before now, do a
+  quick `mcp__things__get_inbox` + calendar re-check to catch anything added since;
+  otherwise trust it.
+
+If there is no fresh briefing, gather everything live:
+
 - Read `Areas/Life OS/Day flow.md` — observed scheduling preferences
 - Read `Areas/Career/Career Talk 2026/Performance Goals.md` — work performance goals
 - Read `Areas/Life OS/🔭 Goals.md` — life goals

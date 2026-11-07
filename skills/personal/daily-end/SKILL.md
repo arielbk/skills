@@ -30,6 +30,7 @@ Run `date +%Y-%m-%d`.
 - `mcp__granola__list_meetings` → fetch notes for today's meetings with `mcp__granola__get_meeting_transcript`
 - Read `Areas/Life OS/Day flow.md`
 - `pmdr today --json` — completed pomodoros grouped by project, as a data point on deep-work blocks
+- `mcp__claude_ai_Slack__slack_search_public_and_private` with `filters: "to:me on:{date}"`, `channel_types: "im,mpim"`, `sort: "timestamp"`: today's DMs. Pick out anything that asks something of the user and hasn't been answered (HR requests, feedback asks, review pings), and ignore bots and threads that already closed.
 
 ### 3. Compute planned vs actual from the Log
 
@@ -67,6 +68,9 @@ Delta:
 📝 Granola meeting notes:
 {condensed key points + action items}
 
+💬 Slack asks awaiting a reply:
+{person: what they need}
+
 🍅 Pomodoros (deep-work blocks):
 {per-project: N pomodoros, total time} — total {sum}
 
@@ -85,7 +89,7 @@ Delta:
 - Fill `🤓 TIL` and `🎉 Wins` sections
 - Add Granola meeting notes to `📝 Notes`
 - Mark completed priorities with ✅
-- Add `## 🔮 For Tomorrow` section with carry-forward items
+- Add `## 🔮 For Tomorrow` section with carry-forward items, including open Slack asks
 
 ### 6. Update Day flow if patterns emerged
 

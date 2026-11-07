@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.arielbk.daily-gather</string>
+
+	<key>ProgramArguments</key>
+	<array>
+		<string>/Users/arielbk/Projects/sandbox/arielbk-skills/skills/personal/daily-gather/launchd/daily-gather.sh</string>
+	</array>
+
+	<!-- Fire at 08:45 local. If the Mac is asleep at 08:45, launchd coalesces
+	     the missed interval and runs once on the next wake. -->
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Hour</key>
+		<integer>8</integer>
+		<key>Minute</key>
+		<integer>45</integer>
+	</dict>
+
+	<!-- Don't rerun at load; only on the calendar interval. -->
+	<key>RunAtLoad</key>
+	<false/>
+
+	<key>StandardOutPath</key>
+	<string>/Users/arielbk/.local/state/daily-gather/launchd.out.log</string>
+	<key>StandardErrorPath</key>
+	<string>/Users/arielbk/.local/state/daily-gather/launchd.err.log</string>
+</dict>
+</plist>
