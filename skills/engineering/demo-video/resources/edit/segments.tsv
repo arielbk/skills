@@ -1,0 +1,24 @@
+# Cut list. One row per segment. Rows sharing a beat are joined with hard cuts; beats inside an act
+# crossfade (crossfade_frames); acts hard-cut on bar lines. Tab-separated; '#' lines are comments.
+# columns: beat  clip  in  out  speed  hold  zoom  cap_at  pos  caption  lock
+#   beat     beat id from SCRIPT.md; project.json "acts" lists beats in play order
+#   clip     file name in the clips dir
+#   in/out   seconds in the raw clip (use RECORDING.md trim hints, then check stills)
+#   speed    1.5 = played 1.5x. Only for scrolls and page loads, never while text is being read
+#   hold     seconds of freeze on the last frame: reading time, ~3 words/s + 1.5 s of the text shown
+#   zoom     "z0>z1@cx,cy@t0+dur" eased punch-in (t0/dur in segment seconds, cx,cy in 1440x900 px)
+#            or "z@cx,cy" to stay zoomed (continue a punch-in across a hard cut); empty = none
+#   cap_at   seconds into the segment when the caption fades in (stagger it from new on-screen text);
+#            "=" = the same caption continues from the previous row (no new fade)
+#   pos      "top" puts the caption at the top (when the lower third holds what the viewer reads)
+#   caption  short line, 10 words or fewer
+#   lock     "bar" = this segment ends exactly on the nearest bar line (land a key moment on a downbeat)
+beat	clip	in	out	speed	hold	zoom	cap_at	pos	caption	lock
+B01	01-empty-app.webm	0.8	5.0	1	1.5		0.8		The app is connected and listening.
+B02	02-first-action.webm	1.5	6.0	1.5	0		0.3		Someone does the first real thing.
+B02	02-first-action.webm	6.0	11.0	1	2.0	1>1.5@800,600@0+1.0	=		Someone does the first real thing.
+B03	03-app-reacts.webm	1.0	6.5	1	1.5	1>1.4@720,330@0.3+1.2	1.2		The app picks it up.
+B04	04-key-click.webm	1.0	5.0	1	0		0.5		One click does the main job.	bar
+B04	04-key-click.webm	5.0	9.0	1	1.0	1.4@667,230	=		One click does the main job.
+B05	05-result.webm	1.0	7.0	1	2.5	1>1.5@700,290@1.0+1.0	0.5		Here is the result.
+B06	06-payoff.webm	1.0	8.0	1	3.0	1>1.5@790,350@2.0+1.0	0.3		And this is why it matters.

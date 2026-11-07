@@ -1,0 +1,28 @@
+{
+  "brand": { "name": "Acme", "logo": "../brand/logo.png" },
+  "clips": "../clips",
+  "segments": "segments.tsv",
+  "output": "../acme-demo.mp4",
+  "fps": 30,
+  "crossfade_frames": 10,
+  "music": {
+    "file": "../music/track.mp3",
+    "bpm": 90,
+    "beats_per_bar": 4,
+    "drop": 8.0,
+    "end": 100.0,
+    "loudness": -18
+  },
+  "intro_cards": [
+    { "at": 0.0, "layers": [["head", "The problem, in five words.", 0.3], ["sub", "Why it hurts, in one line.", 1.0]] },
+    { "at": 2.67, "layers": [["brand", "", 2.67], ["sub", "does one thing about it.", 3.33]] },
+    { "at": 5.33, "layers": [["head", "The outcome.", 5.33], ["sub", "What people get back.", 6.0]] }
+  ],
+  "acts": [
+    { "name": "1 setup -> first reaction", "beats": ["B01", "B02", "B03"], "bars": 8 },
+    { "name": "2 main action -> result", "beats": ["B04", "B05"], "bars": 7 },
+    { "name": "3 payoff", "beats": ["B06"], "bars": 4 }
+  ],
+  "end_card": { "bars": 2, "layers": [["brand", "", 0.0], ["sub", "The one-line promise.", 0.67]] },
+  "music_map": ["0-7", "8-14", "8-11", "32-33"]
+}
